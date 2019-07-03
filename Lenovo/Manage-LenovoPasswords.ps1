@@ -205,86 +205,86 @@ Function Write-LogEntry
 	}
 }
 
-Write-LogEntry -Value "START - Lenovo BIOS password management script." -Severity 1
+Write-LogEntry -Value "START - Lenovo BIOS password management script" -Severity 1
 
 #Parameter validation
 Write-LogEntry -Value "Begin parameter validation" -Severity 1
 
 if(($SupervisorChange) -and !($NewSupervisorPassword -and $OldSupervisorPassword))
 {
-	$ErrorMsg = "When using the SupervisorChange switch, the NewSupervisorPassword and OldSupervisorPassword parameters must also be specified."
+	$ErrorMsg = "When using the SupervisorChange switch, the NewSupervisorPassword and OldSupervisorPassword parameters must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if(($SupervisorClear) -and !($OldSupervisorPassword))
 {
-	$ErrorMsg = "When using the SupervisorClear switch, the OldSupervisorPassword parameter must also be specified."
+	$ErrorMsg = "When using the SupervisorClear switch, the OldSupervisorPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if(($PowerOnChange) -and !($NewPowerOnPassword -and $OldPowerOnPassword))
 {
-	$ErrorMsg = "When using the PowerOnChange switch, the NewPowerOnPassword and OldPowerOnPassword parameters must also be specified."
+	$ErrorMsg = "When using the PowerOnChange switch, the NewPowerOnPassword and OldPowerOnPassword parameters must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if(($PowerOnClear) -and !($OldPowerOnPassword))
 {
-	$ErrorMsg = "When using the PowerOnClear switch, the OldPowerOnPassword parameter must also be specified."
+	$ErrorMsg = "When using the PowerOnClear switch, the OldPowerOnPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if(($SupervisorChange) -and ($SupervisorClear))
 {
-	$ErrorMsg = "Cannot specify the SupervisorChange and SupervisorClear parameters simultaneously."
+	$ErrorMsg = "Cannot specify the SupervisorChange and SupervisorClear parameters simultaneously"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if(($PowerOnChange) -and ($PowerOnClear))
 {
-	$ErrorMsg = "Cannot specify the PowerOnChange and PowerOnClear parameters simultaneously."
+	$ErrorMsg = "Cannot specify the PowerOnChange and PowerOnClear parameters simultaneously"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if(($HDDPasswordClear) -and !($HDDUserPassword))
 {
-	$ErrorMsg = "When using the HDDPasswordClear switch, the HDDUserPassword parameter must also be specified."
+	$ErrorMsg = "When using the HDDPasswordClear switch, the HDDUserPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if(($HDDMasterPassword) -and !($HDDUserPassword))
 {
-	$ErrorMsg = "When specifying a master hard drive password, a user hard drive password must also be specified."
+	$ErrorMsg = "When specifying a master hard drive password, a user hard drive password must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if(($HDDMasterPassword -or $HDDUserPassword) -and !($HDDPasswordClear))
 {
-	$ErrorMsg = "When using the HDDMasterPassword or HDDUserPassword parameters, the HDDPasswordClear parameter must also be specified."
+	$ErrorMsg = "When using the HDDMasterPassword or HDDUserPassword parameters, the HDDPasswordClear parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if(($OldSupervisorPassword -or $NewSupervisorPassword) -and !($SupervisorChange -or $SupervisorClear))
 {
-	$ErrorMsg = "When using the OldSupervisorPassword or NewSupervisorPassword parameters, one of the SupervisorChange or SupervisorClear parameters must also be specified."
+	$ErrorMsg = "When using the OldSupervisorPassword or NewSupervisorPassword parameters, one of the SupervisorChange or SupervisorClear parameters must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if(($OldPowerOnPassword -or $NewPowerOnPassword) -and !($PowerOnChange -or $PowerOnClear))
 {
-	$ErrorMsg = "When using the OldPowerOnPassword or NewPowerOnPassword parameters, one of the PowerOnChange or PowerOnClear parameters must also be specified."
+	$ErrorMsg = "When using the OldPowerOnPassword or NewPowerOnPassword parameters, one of the PowerOnChange or PowerOnClear parameters must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 <#if($OldSupervisorPassword.Count -gt 2)
 {
-	$ErrorMsg = "Too many old supervisor passwords specified. Please specify 2 or fewer passwords."
+	$ErrorMsg = "Too many old supervisor passwords specified. Please specify 2 or fewer passwords"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
 if($OldPowerOnPassword.Count -gt 2)
 {
-	$ErrorMsg = "Too many old power on passwords specified. Please specify 2 or fewer passwords."
+	$ErrorMsg = "Too many old power on passwords specified. Please specify 2 or fewer passwords"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }#>
@@ -292,7 +292,7 @@ if($OldPowerOnPassword.Count -gt 2)
 #Handle the SMSTSPasswordRetry variable
 if(($SMSTSPasswordRetry -gt 0) -and !(Get-TaskSequenceStatus))
 {
-	Write-LogEntry -Value "The SMSTSPasswordRetry was specifed while not running in a task sequence. Resetting SMSTSPasswordRetry to 0." -Severity 2
+	Write-LogEntry -Value "The SMSTSPasswordRetry was specifed while not running in a task sequence. Resetting SMSTSPasswordRetry to 0" -Severity 2
 	$SMSTSPasswordRetry = 0
 }
 if($NUll -eq $SMSTSPasswordRetry)
@@ -313,67 +313,67 @@ if(Get-TaskSequenceStatus)
 {
 	Write-LogEntry -Value "Check for existing task sequence variables" -Severity 1
 	$SMSTSChangeSup = $TSEnv.Value("SMSTSChangeSup")
-	if($NULL -eq $SMSTSChangeSup)
+	if(($SMSTSChangeSup -ne "Success") -or ($SMSTSChangeSup -ne "Failed"))
 	{
-		Write-LogEntry -Value "No previous supervisor password change attempt detected (SMSTSChangeSup = NULL" -Severity 1
+		Write-LogEntry -Value "No previous supervisor password change attempt detected. SMSTSChangeSup = NULL" -Severity 1
 	}
 	else
 	{
-		Write-LogEntry -Value "Previous supervisor password change attempt detected (SMSTSChangeSup = $SMSTSChangeSup" -Severity 1
+		Write-LogEntry -Value "Previous supervisor password change attempt detected. SMSTSChangeSup = $SMSTSChangeSup" -Severity 1
 	}
 	$SMSTSClearSup = $TSEnv.Value("SMSTSClearSup")
-	if($NULL -eq $SMSTSClearSup)
+	if(($SMSTSClearSup -ne "Success") -or ($SMSTSClearSup -ne "Failed"))
 	{
-		Write-LogEntry -Value "No previous supervisor password clear attempt detected (SMSTSClearSup = NULL" -Severity 1
+		Write-LogEntry -Value "No previous supervisor password clear attempt detected. SMSTSClearSup = NULL" -Severity 1
 	}
 	else
 	{
-		Write-LogEntry -Value "Previous supervisor password clear attempt detected (SMSTSClearSup = $SMSTSClearSup" -Severity 1
+		Write-LogEntry -Value "Previous supervisor password clear attempt detected. SMSTSClearSup = $SMSTSClearSup" -Severity 1
 	}
 	$SMSTSChangePo = $TSEnv.Value("SMSTSChangePo")
-	if($NULL -eq $SMSTSChangePo)
+	if(($SMSTSChangePo -ne "Success") -or ($SMSTSChangePo -ne "Failed"))
 	{
-		Write-LogEntry -Value "No previous power on password change attempt detected (SMSTSChangePo = NULL" -Severity 1
+		Write-LogEntry -Value "No previous power on password change attempt detected. SMSTSChangePo = NULL" -Severity 1
 	}
 	else
 	{
-		Write-LogEntry -Value "Previous power on password change attempt detected (SMSTSChangePo = $SMSTSChangePo" -Severity 1
+		Write-LogEntry -Value "Previous power on password change attempt detected. SMSTSChangePo = $SMSTSChangePo" -Severity 1
 	}
 	$SMSTSClearPo = $TSEnv.Value("SMSTSClearPo")
-	if($NULL -eq $SMSTSClearPo)
+	if(($SMSTSClearPo -ne "Success") -or ($SMSTSClearPo -ne "Failed"))
 	{
-		Write-LogEntry -Value "No previous power on password clear attempt detected (SMSTSClearPo = NULL" -Severity 1
+		Write-LogEntry -Value "No previous power on password clear attempt detected. SMSTSClearPo = NULL" -Severity 1
 	}
 	else
 	{
-		Write-LogEntry -Value "Previous power on password clear attempt detected (SMSTSClearPo = $SMSTSClearSup" -Severity 1
+		Write-LogEntry -Value "Previous power on password clear attempt detected. SMSTSClearPo = $SMSTSClearSup" -Severity 1
 	}
 }
 
 #Connect to the Lenovo WMI classes
 try
 {
-	Write-LogEntry -Value "Connect to the Lenovo_BiosPasswordSettings WMI class." -Severity 1
+	Write-LogEntry -Value "Connect to the Lenovo_BiosPasswordSettings WMI class" -Severity 1
 	$PasswordSettings = Get-WmiObject -Namespace root\wmi -Class Lenovo_BiosPasswordSettings
 }
 catch
 {
-	Write-LogEntry -Value "Unable to connect to the Lenovo_BiosPasswordSettings WMI class." -Severity 3
-	throw "Unable to connect to the Lenovo_BiosPasswordSettings WMI class."
+	Write-LogEntry -Value "Unable to connect to the Lenovo_BiosPasswordSettings WMI class" -Severity 3
+	throw "Unable to connect to the Lenovo_BiosPasswordSettings WMI class"
 }
 try
 {
-	Write-LogEntry -Value "Connect to the Lenovo_SetBiosPassword WMI class." -Severity 1
+	Write-LogEntry -Value "Connect to the Lenovo_SetBiosPassword WMI class" -Severity 1
 	$PasswordSet = Get-WmiObject -Namespace root\wmi -Class Lenovo_SetBiosPassword
 }
 catch
 {
-	Write-LogEntry -Value "Unable to connect to the Lenovo_SetBiosPassword WMI class." -Severity 3
-	throw "Unable to connect to the Lenovo_BiosPasswordSettings WMI class."
+	Write-LogEntry -Value "Unable to connect to the Lenovo_SetBiosPassword WMI class" -Severity 3
+	throw "Unable to connect to the Lenovo_BiosPasswordSettings WMI class"
 }
 
 #Get the current password status
-Write-LogEntry -Value "Check the current password state and validate the specified parameters." -Severity 1
+Write-LogEntry -Value "Check the current password state and validate the specified parameters" -Severity 1
 $PasswordStatus = $PasswordSettings.PasswordState
 
 #Attempting to set or clear a supervisor password when no supervisor password currently exists
@@ -382,11 +382,11 @@ if((($PasswordStatus -eq 0) -or ($PasswordStatus -eq 1) -or ($PasswordStatus -eq
 	if ($SupervisorChange)
 	{
 		$SupervisorPWExists = "Failed"
-		Write-LogEntry -Value "No supervisor password currently set. Unable to change the supervisor password." -Severity 3
+		Write-LogEntry -Value "No supervisor password currently set. Unable to change the supervisor password" -Severity 3
 	}
 	if ($SupervisorClear)
 	{
-		Write-LogEntry -Value "No supervisor password currently set. No need to clear the supervisor password." -Severity 2
+		Write-LogEntry -Value "No supervisor password currently set. No need to clear the supervisor password" -Severity 2
 		Clear-Variable SupervisorClear
 	}
 }
@@ -397,11 +397,11 @@ if((($PasswordStatus -eq 0) -or ($PasswordStatus -eq 2) -or ($PasswordStatus -eq
 	if ($PowerOnChange)
 	{
 		$PowerOnPWExists = "Failed"
-		Write-LogEntry -Value "No power on password currently set. Unable to change the power on password." -Severity 3
+		Write-LogEntry -Value "No power on password currently set. Unable to change the power on password" -Severity 3
 	}
 	if ($PowerOnClear)
 	{
-		Write-LogEntry -Value "No power on password currently set. No need to clear the power on password." -Severity 2
+		Write-LogEntry -Value "No power on password currently set. No need to clear the power on password" -Severity 2
 		Clear-Variable PowerOnClear
 	}
 }
@@ -412,7 +412,7 @@ if(($PasswordStatus -eq 2) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 6
 	#Change the existing supervisor password
 	if(($SupervisorChange) -and ($SMSTSChangeSup -ne "Success"))
 	{
-		Write-LogEntry -Value "Attempt to change the existing supervisor password." -Severity 1
+		Write-LogEntry -Value "Attempt to change the existing supervisor password" -Severity 1
 		$SupervisorPWChange = "Failed"
 		if(Get-TaskSequenceStatus)
 		{
@@ -427,7 +427,7 @@ if(($PasswordStatus -eq 2) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 6
 			{
 				$TSEnv.Value("SMSTSChangeSup") = "Success"
 			}
-			Write-LogEntry -Value "The supervisor password is already set correctly." -Severity 1
+			Write-LogEntry -Value "The supervisor password is already set correctly" -Severity 1
 		}
 		else
 		{
@@ -441,7 +441,7 @@ if(($PasswordStatus -eq 2) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 6
 					{
 						$TSEnv.Value("SMSTSChangeSup") = "Success"
 					}
-					Write-LogEntry -Value "The supervisor password has been successfully changed." -Severity 1
+					Write-LogEntry -Value "The supervisor password has been successfully changed" -Severity 1
 					break
 				}
 				else
@@ -452,7 +452,7 @@ if(($PasswordStatus -eq 2) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 6
 			}
 			if($SupervisorPWChange -eq "Failed")
 			{
-				Write-LogEntry -Value "Failed to change the supervisor password." -Severity 3
+				Write-LogEntry -Value "Failed to change the supervisor password" -Severity 3
 			}
 		}
 	}
@@ -460,7 +460,7 @@ if(($PasswordStatus -eq 2) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 6
 	#Clear the existing supervisor password
 	if(($SupervisorClear) -and ($SMSTSClearSup -ne "Success"))
 	{
-		Write-LogEntry -Value "Attempt to clear the existing supervisor password." -Severity 1
+		Write-LogEntry -Value "Attempt to clear the existing supervisor password" -Severity 1
 		$SupervisorPWClear = "Failed"
 		if(Get-TaskSequenceStatus)
 		{
@@ -477,7 +477,7 @@ if(($PasswordStatus -eq 2) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 6
 				{
 					$TSEnv.Value("SMSTSClearSup") = "Success"
 				}
-				Write-LogEntry -Value "The supervisor password has been successfully cleared." -Severity 1
+				Write-LogEntry -Value "The supervisor password has been successfully cleared" -Severity 1
 				break
 			}
 			else
@@ -488,7 +488,7 @@ if(($PasswordStatus -eq 2) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 6
 		}
 		if($SupervisorPWClear -eq "Failed")
 		{
-			Write-LogEntry -Value "Failed to clear the supervisor password." -Severity 3
+			Write-LogEntry -Value "Failed to clear the supervisor password" -Severity 3
 		}
 	}
 }
@@ -499,7 +499,7 @@ if(($PasswordStatus -eq 1) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 5
 	#Change the existing supervisor password
 	if(($PowerOnChange) -and ($SMSTSChangePo -ne "Success"))
 	{
-		Write-LogEntry -Value "Attempt to change the existing power on password." -Severity 1
+		Write-LogEntry -Value "Attempt to change the existing power on password" -Severity 1
 		$PowerOnPWChange = "Failed"
 		if(Get-TaskSequenceStatus)
 		{
@@ -514,7 +514,7 @@ if(($PasswordStatus -eq 1) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 5
 			{
 				$TSEnv.Value("SMSTSChangePo") = "Success"
 			}
-			Write-LogEntry -Value "The power on password is already set correctly." -Severity 1
+			Write-LogEntry -Value "The power on password is already set correctly" -Severity 1
 		}
 		else
 		{
@@ -528,7 +528,7 @@ if(($PasswordStatus -eq 1) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 5
 					{
 						$TSEnv.Value("SMSTSChangePo") = "Success"
 					}
-					Write-LogEntry -Value "The power on password has been successfully changed." -Severity 1
+					Write-LogEntry -Value "The power on password has been successfully changed" -Severity 1
 					break
 				}
 				else
@@ -539,7 +539,7 @@ if(($PasswordStatus -eq 1) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 5
 			}
 			if($PowerOnPWChange -eq "Failed")
 			{
-				Write-LogEntry -Value "Failed to change the power on password." -Severity 3
+				Write-LogEntry -Value "Failed to change the power on password" -Severity 3
 			}
 		}
 	}
@@ -547,7 +547,7 @@ if(($PasswordStatus -eq 1) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 5
 	#Clear the existing power on password
 	if(($PowerOnClear) -and ($SMSTSClearPo -ne "Success"))
 	{
-		Write-LogEntry -Value "Attempt to clear the existing power on password." -Severity 1
+		Write-LogEntry -Value "Attempt to clear the existing power on password" -Severity 1
 		$PowerOnPWClear = "Failed"
 		if(Get-TaskSequenceStatus)
 		{
@@ -564,7 +564,7 @@ if(($PasswordStatus -eq 1) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 5
 				{
 					$TSEnv.Value("SMSTSClearPo") = "Success"
 				}
-				Write-LogEntry -Value "The power on password has been successfully cleared." -Severity 1
+				Write-LogEntry -Value "The power on password has been successfully cleared" -Severity 1
 				break
 			}
 			else
@@ -575,7 +575,7 @@ if(($PasswordStatus -eq 1) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 5
 		}
 		if($PowerOnPWClear -eq "Failed")
 		{
-			Write-LogEntry -Value "Failed to clear the power on password." -Severity 3
+			Write-LogEntry -Value "Failed to clear the power on password" -Severity 3
 		}
 	}
 }
@@ -585,13 +585,13 @@ if ($HDDPasswordClear)
 {
 	if (($HDDUserPassword) -and ($HDDMasterPassword))
 	{
-		Write-LogEntry -Value "Attempt to clear the existing user and master hard drive passwords." -Severity 1
+		Write-LogEntry -Value "Attempt to clear the existing user and master hard drive passwords" -Severity 1
 		$PasswordSet.SetBiosPassword("mhdp1,$HDDMasterPassword,,ascii,us")
 		$PasswordSet.SetBiosPassword("uhdp1,$HDDUserPassword,,ascii,us")
 	}
 	elseif (($HDDUserPassword) -and !($HDDMasterPassword))
 	{
-		Write-LogEntry -Value "Attempt to clear the existing user hard drive password." -Severity 1
+		Write-LogEntry -Value "Attempt to clear the existing user hard drive password" -Severity 1
 		$PasswordSet.SetBiosPassword("uhdp1,$HDDUserPassword,,ascii,us")
 	}
 }
@@ -611,7 +611,7 @@ if((($SupervisorPWExists -eq "Failed") -or ($SupervisorPWChange -eq "Failed") -o
 {
 	if(!($NoUserPrompt))
 	{
-		Write-LogEntry -Value "Failures detected, display on-screen prompts for any required manual actions." -Severity 2
+		Write-LogEntry -Value "Failures detected, display on-screen prompts for any required manual actions" -Severity 2
 		#Close the task sequence progress dialog
 		if(Get-TaskSequenceStatus)
 		{
@@ -646,8 +646,8 @@ if((($SupervisorPWExists -eq "Failed") -or ($SupervisorPWChange -eq "Failed") -o
 	#Exit the script with an error
 	if(!($ContinueOnError))
 	{
-		Write-LogEntry -Value "Failures detected, exiting the script." -Severity 2
+		Write-LogEntry -Value "Failures detected, exiting the script" -Severity 2
 		Exit 1
 	}
 }
-Write-LogEntry -Value "END - Lenovo BIOS password management script." -Severity 1
+Write-LogEntry -Value "END - Lenovo BIOS password management script" -Severity 1
