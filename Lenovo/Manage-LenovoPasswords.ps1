@@ -313,7 +313,7 @@ if(Get-TaskSequenceStatus)
 {
 	Write-LogEntry -Value "Check for existing task sequence variables" -Severity 1
 	$SMSTSChangeSup = $TSEnv.Value("SMSTSChangeSup")
-	if(($SMSTSChangeSup -ne "Success") -or ($SMSTSChangeSup -ne "Failed"))
+	if(($SMSTSChangeSup -ne "Success") -and ($SMSTSChangeSup -ne "Failed"))
 	{
 		Write-LogEntry -Value "No previous supervisor password change attempt detected. SMSTSChangeSup = NULL" -Severity 1
 	}
@@ -322,7 +322,7 @@ if(Get-TaskSequenceStatus)
 		Write-LogEntry -Value "Previous supervisor password change attempt detected. SMSTSChangeSup = $SMSTSChangeSup" -Severity 1
 	}
 	$SMSTSClearSup = $TSEnv.Value("SMSTSClearSup")
-	if(($SMSTSClearSup -ne "Success") -or ($SMSTSClearSup -ne "Failed"))
+	if(($SMSTSClearSup -ne "Success") -and ($SMSTSClearSup -ne "Failed"))
 	{
 		Write-LogEntry -Value "No previous supervisor password clear attempt detected. SMSTSClearSup = NULL" -Severity 1
 	}
@@ -331,7 +331,7 @@ if(Get-TaskSequenceStatus)
 		Write-LogEntry -Value "Previous supervisor password clear attempt detected. SMSTSClearSup = $SMSTSClearSup" -Severity 1
 	}
 	$SMSTSChangePo = $TSEnv.Value("SMSTSChangePo")
-	if(($SMSTSChangePo -ne "Success") -or ($SMSTSChangePo -ne "Failed"))
+	if(($SMSTSChangePo -ne "Success") -and ($SMSTSChangePo -ne "Failed"))
 	{
 		Write-LogEntry -Value "No previous power on password change attempt detected. SMSTSChangePo = NULL" -Severity 1
 	}
@@ -340,7 +340,7 @@ if(Get-TaskSequenceStatus)
 		Write-LogEntry -Value "Previous power on password change attempt detected. SMSTSChangePo = $SMSTSChangePo" -Severity 1
 	}
 	$SMSTSClearPo = $TSEnv.Value("SMSTSClearPo")
-	if(($SMSTSClearPo -ne "Success") -or ($SMSTSClearPo -ne "Failed"))
+	if(($SMSTSClearPo -ne "Success") -and ($SMSTSClearPo -ne "Failed"))
 	{
 		Write-LogEntry -Value "No previous power on password clear attempt detected. SMSTSClearPo = NULL" -Severity 1
 	}
@@ -373,7 +373,7 @@ catch
 }
 
 #Get the current password status
-Write-LogEntry -Value "Check the current password state and validate the specified parameters" -Severity 1
+Write-LogEntry -Value "Get the current password state and validate the specified password is not blank" -Severity 1
 $PasswordStatus = $PasswordSettings.PasswordState
 
 #Attempting to set or clear a supervisor password when no supervisor password currently exists
