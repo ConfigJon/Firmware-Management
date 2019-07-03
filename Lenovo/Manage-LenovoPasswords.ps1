@@ -56,19 +56,19 @@
 
 	.EXAMPLE
 		Change an existing supervisor password
-		Configure-LenovoPasswords.ps1 -SupervisorChange -NewSupervisorPassword <String> -OldSupervisorPassword <String1>,<String2>
+		Manage-LenovoPasswords.ps1 -SupervisorChange -NewSupervisorPassword <String> -OldSupervisorPassword <String1>,<String2>
 
 		Change an existing supervisor password and clear a power on password
-		Configure-LenovoPasswords.ps1 -SupervisorChange -NewSupervisorPassword <String> -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
+		Manage-LenovoPasswords.ps1 -SupervisorChange -NewSupervisorPassword <String> -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
 
 		Clear existing supervisor and power on passwords
-		Configure-LenovoPasswords.ps1 -SupervisorClear -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
+		Manage-LenovoPasswords.ps1 -SupervisorClear -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
 
 		Clear existing user and master hard drive passwords
-		Configure-LenovoPasswords.ps1 -HDDPasswordClear -HDDUserPassword <String> -HDDMasterPassword <String>
+		Manage-LenovoPasswords.ps1 -HDDPasswordClear -HDDUserPassword <String> -HDDMasterPassword <String>
 
 		Clear an existing power on password, suppress any user prompts, and continue on error
-		Configure-LenovoPasswords.ps1 -PowerOnClear -OldPowerOnPassword <String1>,<String2> -NoUserPrompt -ContinueOnError
+		Manage-LenovoPasswords.ps1 -PowerOnClear -OldPowerOnPassword <String1>,<String2> -NoUserPrompt -ContinueOnError
 
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
@@ -155,7 +155,7 @@ else
     	New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
 	}
 }
-Write-Output "Log path set to $LogsDirectory\Configure-LenovoPasswords.log"
+Write-Output "Log path set to $LogsDirectory\Manage-LenovoPasswords.log"
 
 Function Write-LogEntry
 #Write data to a log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
@@ -170,7 +170,7 @@ Function Write-LogEntry
 		[string]$Severity,
 		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
 		[ValidateNotNullOrEmpty()]
-		[string]$FileName = "Configure-LenovoPasswords.log"
+		[string]$FileName = "Manage-LenovoPasswords.log"
 	)
 	# Determine log file location
 	$LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
@@ -194,7 +194,7 @@ Function Write-LogEntry
 	$Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
 		
 	# Construct final log entry
-	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Configure-LenovoPasswords"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
+	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-LenovoPasswords"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
 		
 	# Add value to log file
 	try {
