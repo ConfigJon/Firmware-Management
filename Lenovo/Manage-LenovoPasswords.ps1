@@ -315,38 +315,38 @@ if(Get-TaskSequenceStatus)
 	$SMSTSChangeSup = $TSEnv.Value("SMSTSChangeSup")
 	if(($SMSTSChangeSup -ne "Success") -and ($SMSTSChangeSup -ne "Failed"))
 	{
-		Write-LogEntry -Value "No previous supervisor password change attempt detected. SMSTSChangeSup = NULL" -Severity 1
+		Write-LogEntry -Value "No previous supervisor password change attempt detected" -Severity 1
 	}
 	else
 	{
-		Write-LogEntry -Value "Previous supervisor password change attempt detected. SMSTSChangeSup = $SMSTSChangeSup" -Severity 1
+		Write-LogEntry -Value "Previous supervisor password change attempt detected" -Severity 1
 	}
 	$SMSTSClearSup = $TSEnv.Value("SMSTSClearSup")
 	if(($SMSTSClearSup -ne "Success") -and ($SMSTSClearSup -ne "Failed"))
 	{
-		Write-LogEntry -Value "No previous supervisor password clear attempt detected. SMSTSClearSup = NULL" -Severity 1
+		Write-LogEntry -Value "No previous supervisor password clear attempt detected" -Severity 1
 	}
 	else
 	{
-		Write-LogEntry -Value "Previous supervisor password clear attempt detected. SMSTSClearSup = $SMSTSClearSup" -Severity 1
+		Write-LogEntry -Value "Previous supervisor password clear attempt detected" -Severity 1
 	}
 	$SMSTSChangePo = $TSEnv.Value("SMSTSChangePo")
 	if(($SMSTSChangePo -ne "Success") -and ($SMSTSChangePo -ne "Failed"))
 	{
-		Write-LogEntry -Value "No previous power on password change attempt detected. SMSTSChangePo = NULL" -Severity 1
+		Write-LogEntry -Value "No previous power on password change attempt detected" -Severity 1
 	}
 	else
 	{
-		Write-LogEntry -Value "Previous power on password change attempt detected. SMSTSChangePo = $SMSTSChangePo" -Severity 1
+		Write-LogEntry -Value "Previous power on password change attempt detected" -Severity 1
 	}
 	$SMSTSClearPo = $TSEnv.Value("SMSTSClearPo")
 	if(($SMSTSClearPo -ne "Success") -and ($SMSTSClearPo -ne "Failed"))
 	{
-		Write-LogEntry -Value "No previous power on password clear attempt detected. SMSTSClearPo = NULL" -Severity 1
+		Write-LogEntry -Value "No previous power on password clear attempt detected" -Severity 1
 	}
 	else
 	{
-		Write-LogEntry -Value "Previous power on password clear attempt detected. SMSTSClearPo = $SMSTSClearSup" -Severity 1
+		Write-LogEntry -Value "Previous power on password clear attempt detected" -Severity 1
 	}
 }
 
