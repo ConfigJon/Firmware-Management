@@ -308,10 +308,13 @@ else
 }
 
 #Set variables from a previous script session
-$SMSTSChangeSup = $TSEnv.Value("SMSTSChangeSup")
-$SMSTSClearSup = $TSEnv.Value("SMSTSClearSup")
-$SMSTSChangePo = $TSEnv.Value("SMSTSChangePo")
-$SMSTSClearPo = $TSEnv.Value("SMSTSClearPo")
+if(Get-TaskSequenceStatus)
+{
+	$SMSTSChangeSup = $TSEnv.Value("SMSTSChangeSup")
+	$SMSTSClearSup = $TSEnv.Value("SMSTSClearSup")
+	$SMSTSChangePo = $TSEnv.Value("SMSTSChangePo")
+	$SMSTSClearPo = $TSEnv.Value("SMSTSClearPo")
+}
 
 #Connect to the Lenovo WMI classes
 Write-LogEntry -Value "Connecting to the Lenovo WMI classes..." -Severity 1
