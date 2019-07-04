@@ -313,40 +313,24 @@ if(Get-TaskSequenceStatus)
 {
 	Write-LogEntry -Value "Check for existing task sequence variables" -Severity 1
 	$SMSTSChangeSup = $TSEnv.Value("SMSTSChangeSup")
-	if(($SMSTSChangeSup -ne "Success") -and ($SMSTSChangeSup -ne "Failed"))
+	if($SMSTSChangeSup -eq "Failed")
 	{
-		Write-LogEntry -Value "No previous supervisor password change attempt detected" -Severity 1
-	}
-	else
-	{
-		Write-LogEntry -Value "Previous supervisor password change attempt detected" -Severity 1
+		Write-LogEntry -Value "Previous unsuccessful supervisor password change attempt detected" -Severity 1
 	}
 	$SMSTSClearSup = $TSEnv.Value("SMSTSClearSup")
-	if(($SMSTSClearSup -ne "Success") -and ($SMSTSClearSup -ne "Failed"))
+	if($SMSTSClearSup -eq "Failed")
 	{
-		Write-LogEntry -Value "No previous supervisor password clear attempt detected" -Severity 1
-	}
-	else
-	{
-		Write-LogEntry -Value "Previous supervisor password clear attempt detected" -Severity 1
+		Write-LogEntry -Value "Previous unsuccessful supervisor password clear attempt detected" -Severity 1
 	}
 	$SMSTSChangePo = $TSEnv.Value("SMSTSChangePo")
-	if(($SMSTSChangePo -ne "Success") -and ($SMSTSChangePo -ne "Failed"))
+	if($SMSTSChangePo -eq "Failed")
 	{
-		Write-LogEntry -Value "No previous power on password change attempt detected" -Severity 1
-	}
-	else
-	{
-		Write-LogEntry -Value "Previous power on password change attempt detected" -Severity 1
+		Write-LogEntry -Value "Previous unsuccessful power on password change attempt detected" -Severity 1
 	}
 	$SMSTSClearPo = $TSEnv.Value("SMSTSClearPo")
-	if(($SMSTSClearPo -ne "Success") -and ($SMSTSClearPo -ne "Failed"))
+	if($SMSTSClearPo -eq "Failed")
 	{
-		Write-LogEntry -Value "No previous power on password clear attempt detected" -Severity 1
-	}
-	else
-	{
-		Write-LogEntry -Value "Previous power on password clear attempt detected" -Severity 1
+		Write-LogEntry -Value "Previous unsuccessful power on password clear attempt detected" -Severity 1
 	}
 }
 
