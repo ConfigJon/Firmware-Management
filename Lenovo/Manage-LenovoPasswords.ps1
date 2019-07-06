@@ -105,24 +105,24 @@ Function Get-TaskSequenceStatus
 
 	if($NULL -eq $TSEnv)
 	{
-    	return $False
+		return $False
 	}
 	else
 	{
-    	try
-    	{
-        	$SMSTSType = $TSEnv.Value("_SMSTSType")
-    	}
-    	catch{}
+		try
+		{
+			$SMSTSType = $TSEnv.Value("_SMSTSType")
+		}
+		catch{}
 
-    	if($NULL -eq $SMSTSType)
-    	{
-        	return $False
-    	}
-    	else
-    	{
-        	return $True
-    	}
+		if($NULL -eq $SMSTSType)
+		{
+			return $False
+		}
+		else
+		{
+			return $True
+		}
 	}
 }
 
@@ -153,7 +153,7 @@ else
 	$LogsDirectory = "$ENV:SystemRoot\Temp\LenovoPasswordScript"
 	if (!(Test-Path -PathType Container $LogsDirectory))
 	{
-    	New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
+		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
 	}
 }
 Write-Output "Log path set to $LogsDirectory\Manage-LenovoPasswords.log"
