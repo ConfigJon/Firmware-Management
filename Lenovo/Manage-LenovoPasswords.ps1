@@ -70,10 +70,10 @@
 		Clear an existing power on password, suppress any user prompts, and continue on error
 		Manage-LenovoPasswords.ps1 -PowerOnClear -OldPowerOnPassword <String1>,<String2> -NoUserPrompt -ContinueOnError
 
-    .NOTES
+	.NOTES
 		Created by: Jon Anderson (@ConfigJon)
 		Reference: https://www.configjon.com/lenovo-bios-password-management
-        Modifed: 7/6/2019
+		Modifed: 7/6/2019
 #>
 
 #Parameter declaration
