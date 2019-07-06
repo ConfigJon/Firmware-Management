@@ -277,7 +277,7 @@ if(($OldPowerOnPassword -or $NewPowerOnPassword) -and !($PowerOnChange -or $Powe
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-<if($OldSupervisorPassword.Count -gt 2) #Prevents entering more than 2 old supervisor passwords
+if($OldSupervisorPassword.Count -gt 2) #Prevents entering more than 2 old supervisor passwords
 {
 	$ErrorMsg = "Please specify 2 or fewer old supervisor passwords"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
