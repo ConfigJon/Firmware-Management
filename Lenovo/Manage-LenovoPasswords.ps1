@@ -71,15 +71,16 @@
 		Manage-LenovoPasswords.ps1 -PowerOnClear -OldPowerOnPassword <String1>,<String2> -NoUserPrompt -ContinueOnError
 
     .NOTES
-        Created by: Jon Anderson (@ConfigJon)
-        Modifed: 7/3/2019
+		Created by: Jon Anderson (@ConfigJon)
+		Reference: https://www.configjon.com/lenovo-bios-password-management
+        Modifed: 7/6/2019
 #>
 
 #Parameter declaration
 param(
-    [Parameter(Mandatory=$false)][Switch]$SupervisorChange,
-    [Parameter(Mandatory=$false)][Switch]$SupervisorClear,
-    [Parameter(Mandatory=$false)][Switch]$PowerOnChange,
+	[Parameter(Mandatory=$false)][Switch]$SupervisorChange,
+	[Parameter(Mandatory=$false)][Switch]$SupervisorClear,
+	[Parameter(Mandatory=$false)][Switch]$PowerOnChange,
 	[Parameter(Mandatory=$false)][Switch]$PowerOnClear,
 	[Parameter(Mandatory=$false)][Switch]$HDDPasswordClear,
 	[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$NewSupervisorPassword,
@@ -160,7 +161,7 @@ Write-Output "Log path set to $LogsDirectory\Manage-LenovoPasswords.log"
 Function Write-LogEntry
 #Write data to a log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
 {
-	param (
+	param(
 		[parameter(Mandatory = $true, HelpMessage = "Value added to the log file.")]
 		[ValidateNotNullOrEmpty()]
 		[string]$Value,
@@ -176,9 +177,9 @@ Function Write-LogEntry
 	$LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
 		
 	# Construct time stamp for log entry
-	if (-not(Test-Path -Path 'variable:global:TimezoneBias')) {
+	if(-not(Test-Path -Path 'variable:global:TimezoneBias')) {
 		[string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
-		if ($TimezoneBias -match "^-") {
+		if($TimezoneBias -match "^-") {
 			$TimezoneBias = $TimezoneBias.Replace('-', '+')
 		}
 		else {
@@ -197,7 +198,7 @@ Function Write-LogEntry
 	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-LenovoPasswords"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
 		
 	# Add value to log file
-	try {
+	try{
 		Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
 	}
 	catch [System.Exception] {
@@ -276,18 +277,18 @@ if(($OldPowerOnPassword -or $NewPowerOnPassword) -and !($PowerOnChange -or $Powe
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-<#if($OldSupervisorPassword.Count -gt 2)
+<if($OldSupervisorPassword.Count -gt 2) #Prevents entering more than 2 old supervisor passwords
 {
-	$ErrorMsg = "Too many old supervisor passwords specified. Please specify 2 or fewer passwords"
+	$ErrorMsg = "Please specify 2 or fewer old supervisor passwords"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if($OldPowerOnPassword.Count -gt 2)
+if($OldPowerOnPassword.Count -gt 2) #Prevents entering more than 2 old power on passwords
 {
-	$ErrorMsg = "Too many old power on passwords specified. Please specify 2 or fewer passwords"
+	$ErrorMsg = "Please specify 2 or fewer old power on passwords"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
-}#>
+}
 
 #Handle the SMSTSPasswordRetry variable
 if(($SMSTSPasswordRetry -gt 0) -and !(Get-TaskSequenceStatus))
