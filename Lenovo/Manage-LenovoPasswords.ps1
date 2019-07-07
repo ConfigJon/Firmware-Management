@@ -632,7 +632,12 @@ if((($SupervisorPWExists -eq "Failed") -or ($SupervisorPWChange -eq "Failed") -o
 	if(!($ContinueOnError))
 	{
 		Write-LogEntry -Value "Failures detected, exiting the script" -Severity 2
+		Write-Output "Password management tasks failed. Check the log file for more information"
 		Exit 1
 	}
+}
+else
+{
+	Write-Output "Password management tasks succeeded. Check the log file for more information"
 }
 Write-LogEntry -Value "END - Lenovo BIOS password management script" -Severity 1
