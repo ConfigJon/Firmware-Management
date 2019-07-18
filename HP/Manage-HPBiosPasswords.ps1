@@ -1,5 +1,5 @@
 <#
-    .DESCRIPTION
+	.DESCRIPTION
 		Automatically configure HP BIOS passwords and prompt the user if manual intervention is required.
 		
 	.PARAMETER SetupSet

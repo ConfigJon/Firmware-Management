@@ -76,12 +76,10 @@
 		Modifed: 7/17/2019
 
 	.CHANGELOG
-		07/17/19 -	Changed the script name to Manage-LenovoBiosPasswords
-					Changed the log directory name to LenovoBiosScripts
-					Changed the log file name to Manage-LenovoBiosPasswords
+		07/17/19 - Updated the script name to Manage-LenovoBiosPasswords. Updated the log directory name to LenovoBiosScripts. Updated the log file name to Manage-LenovoBiosPasswords
 #>
 
-#Parameter declaration
+#Parameter Declaration
 param(
 	[Parameter(Mandatory=$false)][Switch]$SupervisorChange,
 	[Parameter(Mandatory=$false)][Switch]$SupervisorClear,
