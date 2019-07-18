@@ -51,6 +51,9 @@
 		Clear an existing setup password
 		Manage-HPBiosPasswords.ps1 -SetupClear -OldSetupPassword <String1>,<String2>
 
+		Set a new setup password and change an existing setup password
+		Manage-HPBiosPasswords.ps1 -SetupSet -SetupChange -SetupPassword <String> -OldSetupPassword <String1>,<String2>
+
 		Change an existing Setup password and clear a power on password
 		Manage-HPBiosPasswords.ps1 -SetupChange -SetupPassword <String> -OldSetupPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
 
