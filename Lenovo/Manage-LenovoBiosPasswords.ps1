@@ -1,16 +1,16 @@
 <#
-    .DESCRIPTION
-        Automatically configure Lenovo BIOS passwords and prompt the user if manual intervention is required.
+	.DESCRIPTION
+		Automatically configure Lenovo BIOS passwords and prompt the user if manual intervention is required.
 
-    	PASSWORD STATUS CODES
-        0 - No password set
-        1 - Power on password set
-        2 - Supervisor password set
-        3 - Power on and supervisor passwords set
-        4 - Hard drive password set
-        5 - Power on and hard drive passwords set
-        6 - Supervisor and hard drive passwords set
-        7 - Supervisor, power on, and hard drive passwords set
+		PASSWORD STATUS CODES
+		0 - No password set
+		1 - Power on password set
+		2 - Supervisor password set
+		3 - Power on and supervisor passwords set
+		4 - Hard drive password set
+		5 - Power on and hard drive passwords set
+		6 - Supervisor and hard drive passwords set
+		7 - Supervisor, power on, and hard drive passwords set
 
 	.PARAMETER SupervisorChange
 		Specify this switch to change an existing supervisor password. Must also specify the NewSupervisorPassword and OldSupervisorPassword parameters.
@@ -73,7 +73,12 @@
 	.NOTES
 		Created by: Jon Anderson (@ConfigJon)
 		Reference: https://www.configjon.com/lenovo-bios-password-management
-		Modifed: 7/6/2019
+		Modifed: 7/17/2019
+
+	.CHANGELOG
+		07/17/19 -	Changed the script name to Manage-LenovoBiosPasswords
+					Changed the log directory name to LenovoBiosScripts
+					Changed the log file name to Manage-LenovoBiosPasswords
 #>
 
 #Parameter declaration
@@ -150,13 +155,13 @@ if(Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:SystemRoot\Temp\LenovoPasswordScript"
+	$LogsDirectory = "$ENV:SystemRoot\Temp\LenovoBiosScripts"
 	if (!(Test-Path -PathType Container $LogsDirectory))
 	{
 		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
 	}
 }
-Write-Output "Log path set to $LogsDirectory\Manage-LenovoPasswords.log"
+Write-Output "Log path set to $LogsDirectory\Manage-LenovoBiosPasswords.log"
 
 Function Write-LogEntry
 #Write data to a log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
