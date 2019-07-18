@@ -56,19 +56,19 @@
 
 	.EXAMPLE
 		Change an existing supervisor password
-		Manage-LenovoPasswords.ps1 -SupervisorChange -NewSupervisorPassword <String> -OldSupervisorPassword <String1>,<String2>
+		Manage-LenovoBiosPasswords.ps1 -SupervisorChange -NewSupervisorPassword <String> -OldSupervisorPassword <String1>,<String2>
 
 		Change an existing supervisor password and clear a power on password
-		Manage-LenovoPasswords.ps1 -SupervisorChange -NewSupervisorPassword <String> -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
+		Manage-LenovoBiosPasswords.ps1 -SupervisorChange -NewSupervisorPassword <String> -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
 
 		Clear existing supervisor and power on passwords
-		Manage-LenovoPasswords.ps1 -SupervisorClear -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
+		Manage-LenovoBiosPasswords.ps1 -SupervisorClear -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
 
 		Clear existing user and master hard drive passwords
-		Manage-LenovoPasswords.ps1 -HDDPasswordClear -HDDUserPassword <String> -HDDMasterPassword <String>
+		Manage-LenovoBiosPasswords.ps1 -HDDPasswordClear -HDDUserPassword <String> -HDDMasterPassword <String>
 
 		Clear an existing power on password, suppress any user prompts, and continue on error
-		Manage-LenovoPasswords.ps1 -PowerOnClear -OldPowerOnPassword <String1>,<String2> -NoUserPrompt -ContinueOnError
+		Manage-LenovoBiosPasswords.ps1 -PowerOnClear -OldPowerOnPassword <String1>,<String2> -NoUserPrompt -ContinueOnError
 
 	.NOTES
 		Created by: Jon Anderson (@ConfigJon)
