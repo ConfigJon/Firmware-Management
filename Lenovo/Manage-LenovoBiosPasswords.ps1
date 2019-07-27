@@ -76,7 +76,7 @@
 		Modifed: 7/27/2019
 
 	.CHANGELOG
-        07/17/19 - Updated the script name to Manage-LenovoBiosPasswords. Updated the log directory name to LenovoBiosScripts. Updated the log file name to Manage-LenovoBiosPasswords
+		07/17/19 - Updated the script name to Manage-LenovoBiosPasswords. Updated the log directory name to LenovoBiosScripts. Updated the log file name to Manage-LenovoBiosPasswords
 		07/27/19 - Formatting changes. Changed the NewSupervisorPassword parameter to SupervisorPassword. Changed the NewPowerOnPassword parameter to PowerOnPassword.
 					Changed the SMSTSPasswordRetry parameter to be a switch instead of an integer value. Changed the SMSTSChangeSup TS variable to LenovoChangeSupervisor.
 					Changed the SMSTSClearSup TS variable to LenovoClearSupervisor. Changed the SMSTSChangePo TS variable to LenovoChangePowerOn. Changed the SMSTSClearPo TS variable to LenovoClearPowerOn
