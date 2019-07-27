@@ -73,7 +73,7 @@
 	.NOTES
 		Created by: Jon Anderson (@ConfigJon)
 		Reference: https://www.configjon.com/lenovo-bios-password-management
-		Modifed: 7/17/2019
+		Modifed: 7/27/2019
 
 	.CHANGELOG
         07/17/19 - Updated the script name to Manage-LenovoBiosPasswords. Updated the log directory name to LenovoBiosScripts. Updated the log file name to Manage-LenovoBiosPasswords
