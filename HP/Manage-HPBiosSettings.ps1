@@ -11,7 +11,7 @@
         5 - Invalid Parameter
         6 - Access Denied - (Check that the BIOS password is correct)
     
-    .PARAMETER Password
+    .PARAMETER SetupPassword
         The current BIOS password
 
     .EXAMPLE
@@ -19,8 +19,8 @@
 
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
-        Reference:
-        Modified: 7/28/2019
+        Reference: https://www.configjon.com/hp-bios-settings-management/
+        Modified: 7/29/2019
 #>
 
 #Parameters ===================================================================================================================
