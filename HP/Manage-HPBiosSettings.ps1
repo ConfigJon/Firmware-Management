@@ -67,8 +67,6 @@ $Settings = (
     #Security Settings
     "Password prompt on F9 & F12;Enable", #Enable,Disable
     "Password prompt on F9 F11 & F12;Enable", #Enable,Disable
-    "Password prompt on F9, F11 & F12;Enable", #Enable,Disable
-    "Password prompt on F9, F11, & F12;Enable", #Enable,Disable
     "Prompt for Admin password on F9 (Boot Menu);Enable", #Disable,Enable
     "Prompt for Admin password on F11 (System Recovery);Enable", #Disable,Enable
     "Prompt for Admin password on F12 (Network Boot);Enable", #Disable,Enable
@@ -275,7 +273,7 @@ Write-LogEntry -Value "START - HP BIOS settings management script" -Severity 1
 try
 {
     Write-LogEntry -Value "Connect to the HP_BIOSEnumeration WMI class" -Severity 1
-    $SettingList = Get-WmiObject -Namespace root/hp/InstrumentedBIOS -Class HP_BIOSEnumeration
+    $SettingList = Get-WmiObject -Namespace root\HP\InstrumentedBIOS -Class HP_BIOSEnumeration
 }
 catch
 {
@@ -287,7 +285,7 @@ catch
 try
 {
     Write-LogEntry -Value "Connect to the HP_BIOSSettingInterface WMI class" -Severity 1
-    $Interface = Get-WmiObject -Namespace root/hp/InstrumentedBIOS -Class HP_BIOSSettingInterface
+    $Interface = Get-WmiObject -Namespace root\HP\InstrumentedBIOS -Class HP_BIOSSettingInterface
 }
 catch
 {
@@ -299,7 +297,7 @@ catch
 try
 {
     Write-LogEntry -Value "Connect to the HP_BIOSSetting WMI class" -Severity 1
-    $HPBiosSetting = Get-WmiObject -Namespace root/hp/InstrumentedBIOS -Class HP_BIOSSetting
+    $HPBiosSetting = Get-WmiObject -Namespace root\HP\InstrumentedBIOS -Class HP_BIOSSetting
 }
 catch
 {
