@@ -17,7 +17,7 @@
 
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
-        Reference:
+        Reference: https://www.configjon.com/working-with-the-dell-command-powershell-provider/
         Modified: 11/03/2019
 #>
 
@@ -350,42 +350,42 @@ Function Write-LogEntry
 		[ValidateNotNullOrEmpty()]
 		[string]$FileName = "Install-DellBiosProvider.log"
 	)
-	# Determine log file location
-	$LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
+    # Determine log file location
+    $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
 		
-	# Construct time stamp for log entry
+    # Construct time stamp for log entry
     if (-not(Test-Path -Path 'variable:global:TimezoneBias'))
     {
-		[string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
+        [string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
         if ($TimezoneBias -match "^-")
         {
-			$TimezoneBias = $TimezoneBias.Replace('-', '+')
-		}
+            $TimezoneBias = $TimezoneBias.Replace('-', '+')
+        }
         else
         {
-			$TimezoneBias = '-' + $TimezoneBias
-		}
-	}
-	$Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
+            $TimezoneBias = '-' + $TimezoneBias
+        }
+    }
+    $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
 		
-	# Construct date for log entry
-	$Date = (Get-Date -Format "MM-dd-yyyy")
+    # Construct date for log entry
+    $Date = (Get-Date -Format "MM-dd-yyyy")
 		
-	# Construct context for log entry
-	$Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
+    # Construct context for log entry
+    $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
 		
-	# Construct final log entry
-	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Install-DellBiosProvider"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
+    # Construct final log entry
+    $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Install-DellBiosProvider"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
 		
-	# Add value to log file
+    # Add value to log file
     try
     {
-		Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
-	}
+        Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
+    }
     catch [System.Exception]
     {
-		Write-Warning -Message "Unable to append log entry to $FileName file. Error message at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)"
-	}
+        Write-Warning -Message "Unable to append log entry to $FileName file. Error message at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)"
+    }
 }
 
 #Main program =================================================================================================================

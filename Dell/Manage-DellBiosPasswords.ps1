@@ -1,8 +1,8 @@
 <#
-    .DESCRIPTION
-        Automatically configure Dell BIOS passwords and prompt the user if manual intervention is required.
+	.DESCRIPTION
+		Automatically configure Dell BIOS passwords and prompt the user if manual intervention is required.
 
-    .PARAMETER AdminSet
+	.PARAMETER AdminSet
 		Specify this switch to set a new admin password when no password currently exists
 
 	.PARAMETER AdminChange
@@ -41,7 +41,7 @@
 	.PARAMETER SMSTSPasswordRetry
 		For use in a task sequence. If specified, the script will assume the script needs to run at least one more time. This will ignore password errors and suppress user prompts.
 
-    .EXAMPLE
+	.EXAMPLE
 		Set a new admin password
 		Manage-DellBiosPasswords.ps1 -AdminSet -AdminPassword <String>
 	
@@ -57,16 +57,16 @@
 		Set a new admin password and set a new system password
 		Manage-DellBiosPasswords.ps1 -AdminSet -SystemSet -AdminPassword <String> -SystemPassword <String>
 
-    .NOTES
-        Created by: Jon Anderson (@ConfigJon)
-        Reference:
-        Modified: 11/03/2019
+	.NOTES
+		Created by: Jon Anderson (@ConfigJon)
+		Reference: https://www.configjon.com/dell-bios-password-management/
+		Modified: 11/03/2019
 #>
 
 #Parameters ===================================================================================================================
 
 param(
-    [Parameter(Mandatory=$false)][Switch]$AdminSet,
+	[Parameter(Mandatory=$false)][Switch]$AdminSet,
 	[Parameter(Mandatory=$false)][Switch]$AdminChange,
 	[Parameter(Mandatory=$false)][Switch]$AdminClear,
 	[Parameter(Mandatory=$false)][Switch]$SystemSet,
@@ -149,15 +149,15 @@ Function Write-LogEntry
 	$LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
 		
 	# Construct time stamp for log entry
-    if (-not(Test-Path -Path 'variable:global:TimezoneBias'))
-    {
+	if (-not(Test-Path -Path 'variable:global:TimezoneBias'))
+	{
 		[string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
-        if ($TimezoneBias -match "^-")
-        {
+		if ($TimezoneBias -match "^-")
+		{
 			$TimezoneBias = $TimezoneBias.Replace('-', '+')
 		}
-        else
-        {
+		else
+		{
 			$TimezoneBias = '-' + $TimezoneBias
 		}
 	}
@@ -173,12 +173,12 @@ Function Write-LogEntry
 	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-DellBiosPasswords"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
 		
 	# Add value to log file
-    try
-    {
+	try
+	{
 		Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
 	}
-    catch [System.Exception]
-    {
+	catch [System.Exception]
+	{
 		Write-Warning -Message "Unable to append log entry to $FileName file. Error message at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)"
 	}
 }
@@ -445,7 +445,7 @@ if ($AdminPasswordCheck -eq "False")
 				Write-LogEntry -Value "The admin password has been successfully set" -Severity 1
 			}	
 		}
-    }
+	}
 }
 
 #No system password currently set
@@ -492,7 +492,7 @@ if ($SystemPasswordCheck -eq "False")
 				Write-LogEntry -Value "The system password has been successfully set" -Severity 1
 			}	
 		}
-    }
+	}
 }
 
 #If a admin password is set, attempt to clear or change it
@@ -508,29 +508,28 @@ if ($AdminPasswordCheck -eq "True")
 			$TSEnv.Value("DellChangeAdmin") = "Failed"
 		}
         
-        try
-        {
-            Set-Item -Path DellSmbios:\Security\AdminPassword $AdminPassword -Password $AdminPassword -ErrorAction Stop
-        }
-        catch
-        {
-            $AdminSetFail = $true
-            $Counter = 0
+		try
+		{
+			Set-Item -Path DellSmbios:\Security\AdminPassword $AdminPassword -Password $AdminPassword -ErrorAction Stop
+		}
+		catch
+		{
+			$AdminSetFail = $true
+			$Counter = 0
 			While($Counter -lt $OldAdminPassword.Count){
-                $Error.Clear()
-                try
-                {
-                    Set-Item -Path DellSmbios:\Security\AdminPassword $AdminPassword -Password $OldAdminPassword[$Counter] -ErrorAction Stop
-                }
-                catch
+				$Error.Clear()
+				try
 				{
-                    #Failed to change the password
+					Set-Item -Path DellSmbios:\Security\AdminPassword $AdminPassword -Password $OldAdminPassword[$Counter] -ErrorAction Stop
+				}
+				catch
+				{
+					#Failed to change the password
 					$Counter++
-
-                }
-                if (!($Error))
-                {
-                    #Successfully changed the password
+				}
+				if (!($Error))
+				{
+					#Successfully changed the password
 					$AdminPWChange = "Success"
 					if (Get-TaskSequenceStatus)
 					{
@@ -538,13 +537,13 @@ if ($AdminPasswordCheck -eq "True")
 					}
 					Write-LogEntry -Value "The admin password has been successfully changed" -Severity 1
 					break
-                }
+				}
 			}
 			if ($AdminPWChange -eq "Failed")
 			{
 				Write-LogEntry -Value "Failed to change the admin password" -Severity 3
 			}
-        }
+		}
 		if (!($AdminSetFail))
 		{
 			#Password already correct
@@ -568,9 +567,9 @@ if ($AdminPasswordCheck -eq "True")
 		}
 		
 		try
-        {
-            Set-Item -Path DellSmbios:\Security\AdminPassword "" -Password $AdminPassword -ErrorAction Stop
-        }
+		{
+			Set-Item -Path DellSmbios:\Security\AdminPassword "" -Password $AdminPassword -ErrorAction Stop
+		}
 		catch
 		{
 			$AdminClearFail = $true
@@ -631,7 +630,7 @@ if ($AdminPasswordCheck -eq "True")
 				Write-LogEntry -Value "The admin password has been successfully cleared" -Severity 1
 			}
 		}
-    }
+	}
 }
 
 #If a system password is set, attempt to clear or change it
@@ -647,30 +646,30 @@ if ($SystemPasswordCheck -eq "True")
 			$TSEnv.Value("DellChangeSystem") = "Failed"
 		}
         
-        try
-        {
-            Set-Item -Path DellSmbios:\Security\SystemPassword $SystemPassword -Password $SystemPassword -ErrorAction Stop
-        }
-        catch
-        {
-            $SystemSetFail = $true
+		try
+		{
+			Set-Item -Path DellSmbios:\Security\SystemPassword $SystemPassword -Password $SystemPassword -ErrorAction Stop
+		}
+		catch
+		{
+			$SystemSetFail = $true
 			$Counter = 0
 			if ($OldSystemPassword)
 			{
 				While($Counter -lt $OldSystemPassword.Count){
-                	$Error.Clear()
-                	try
-                	{
-                    	Set-Item -Path DellSmbios:\Security\SystemPassword $SystemPassword -Password $OldSystemPassword[$Counter] -ErrorAction Stop
-                	}
-                	catch
+					$Error.Clear()
+					try
 					{
-                    	#Failed to change the password
+						Set-Item -Path DellSmbios:\Security\SystemPassword $SystemPassword -Password $OldSystemPassword[$Counter] -ErrorAction Stop
+					}
+					catch
+					{
+						#Failed to change the password
 						$Counter++
-                	}
-                	if (!($Error))
-                	{
-                    	#Successfully changed the password
+					}
+					if (!($Error))
+					{
+					#Successfully changed the password
 						$SystemPWChange = "Success"
 						if (Get-TaskSequenceStatus)
 						{
@@ -685,7 +684,7 @@ if ($SystemPasswordCheck -eq "True")
 			{
 				Write-LogEntry -Value "Failed to change the system password" -Severity 3
 			}
-        }
+		}
 		if (!($SystemSetFail))
 		{
 			#Password already correct
@@ -709,9 +708,9 @@ if ($SystemPasswordCheck -eq "True")
 		}
 		
 		try
-        {
-            Set-Item -Path DellSmbios:\Security\SystemPassword "" -Password $SystemPassword -ErrorAction Stop
-        }
+		{
+			Set-Item -Path DellSmbios:\Security\SystemPassword "" -Password $SystemPassword -ErrorAction Stop
+		}
 		catch
 		{
 			$SystemClearFail = $true
