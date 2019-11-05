@@ -73,13 +73,15 @@
 	.NOTES
 		Created by: Jon Anderson (@ConfigJon)
 		Reference: https://www.configjon.com/lenovo-bios-password-management
-		Modifed: 7/27/2019
+		Modifed: 11/04/2019
 
 	.CHANGELOG
 		07/17/19 - Updated the script name to Manage-LenovoBiosPasswords. Updated the log directory name to LenovoBiosScripts. Updated the log file name to Manage-LenovoBiosPasswords
 		07/27/19 - Formatting changes. Changed the NewSupervisorPassword parameter to SupervisorPassword. Changed the NewPowerOnPassword parameter to PowerOnPassword.
 					Changed the SMSTSPasswordRetry parameter to be a switch instead of an integer value. Changed the SMSTSChangeSup TS variable to LenovoChangeSupervisor.
 					Changed the SMSTSClearSup TS variable to LenovoClearSupervisor. Changed the SMSTSChangePo TS variable to LenovoChangePowerOn. Changed the SMSTSClearPo TS variable to LenovoClearPowerOn
+		11/04/19 - Added additional logging. Changed the default log path to $ENV:ProgramData\BiosScripts\Lenovo. Modifed the parameter validation logic.
+					Added logic to allow for the SupervisorPassword and PowerOnPassword parameters to be used when clearing a password.
 #>
 
 #Parameters ===================================================================================================================
@@ -163,21 +165,21 @@ Function Write-LogEntry
 		[string]$Severity,
 		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
 		[ValidateNotNullOrEmpty()]
-		[string]$FileName = "Manage-LenovoPasswords.log"
+		[string]$FileName = "Manage-LenovoBiosPasswords.log"
 	)
 	# Determine log file location
 	$LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
 		
 	# Construct time stamp for log entry
-    if (-not(Test-Path -Path 'variable:global:TimezoneBias'))
-    {
+	if (-not(Test-Path -Path 'variable:global:TimezoneBias'))
+	{
 		[string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
-        if ($TimezoneBias -match "^-")
-        {
+		if ($TimezoneBias -match "^-")
+		{
 			$TimezoneBias = $TimezoneBias.Replace('-', '+')
 		}
-        else
-        {
+		else
+		{
 			$TimezoneBias = '-' + $TimezoneBias
 		}
 	}
@@ -190,15 +192,15 @@ Function Write-LogEntry
 	$Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
 		
 	# Construct final log entry
-	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-LenovoPasswords"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
+	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-LenovoBiosPasswords"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
 		
 	# Add value to log file
-    try
-    {
+	try
+	{
 		Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
 	}
-    catch [System.Exception]
-    {
+	catch [System.Exception]
+	{
 		Write-Warning -Message "Unable to append log entry to $FileName file. Error message at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)"
 	}
 }
@@ -214,7 +216,7 @@ if (Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:SystemRoot\Temp\LenovoBiosScripts"
+	$LogsDirectory = "$ENV:ProgramData\BiosScripts\Lenovo"
 	if (!(Test-Path -PathType Container $LogsDirectory))
 	{
 		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
@@ -224,6 +226,7 @@ Write-Output "Log path set to $LogsDirectory\Manage-LenovoBiosPasswords.log"
 Write-LogEntry -Value "START - Lenovo BIOS password management script" -Severity 1
 
 #Connect to the Lenovo_BiosPasswordSettings WMI class
+$Error.Clear()
 try
 {
 	Write-LogEntry -Value "Connect to the Lenovo_BiosPasswordSettings WMI class" -Severity 1
@@ -234,8 +237,13 @@ catch
 	Write-LogEntry -Value "Unable to connect to the Lenovo_BiosPasswordSettings WMI class" -Severity 3
 	throw "Unable to connect to the Lenovo_BiosPasswordSettings WMI class"
 }
+if (!($Error))
+{
+	Write-LogEntry -Value "Successfully connected to the Lenovo_BiosPasswordSettings WMI class" -Severity 1
+}	
 
 #Connect to the Lenovo_SetBiosPassword WMI class
+$Error.Clear()
 try
 {
 	Write-LogEntry -Value "Connect to the Lenovo_SetBiosPassword WMI class" -Severity 1
@@ -245,6 +253,30 @@ catch
 {
 	Write-LogEntry -Value "Unable to connect to the Lenovo_SetBiosPassword WMI class" -Severity 3
 	throw "Unable to connect to the Lenovo_BiosPasswordSettings WMI class"
+}
+if (!($Error))
+{
+	Write-LogEntry -Value "Successfully connected to the Lenovo_SetBiosPassword WMI class" -Severity 1
+}	
+
+#Get the current password status
+Write-LogEntry -Value "Get the current password state and validate the specified password is not blank" -Severity 1
+$PasswordStatus = $PasswordSettings.PasswordState
+if ((($PasswordStatus -eq 0) -or ($PasswordStatus -eq 1) -or ($PasswordStatus -eq 4) -or ($PasswordStatus -eq 5)))
+{
+	Write-LogEntry -Value "The supervisor password is not currently set"
+}
+else
+{
+	Write-LogEntry -Value "The supervisor password is currently set"
+}
+if ((($PasswordStatus -eq 0) -or ($PasswordStatus -eq 2) -or ($PasswordStatus -eq 4) -or ($PasswordStatus -eq 6)))
+{
+	Write-LogEntry -Value "The power on password is not currently set"
+}
+else
+{
+	Write-LogEntry -Value "The power on password is currently set"
 }
 
 #Parameter validation
@@ -256,9 +288,9 @@ if (($SupervisorChange) -and !($SupervisorPassword -and $OldSupervisorPassword))
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($SupervisorClear) -and !($OldSupervisorPassword))
+if (($SupervisorClear) -and !($OldSupervisorPassword -or $SupervisorPassword))
 {
-	$ErrorMsg = "When using the SupervisorClear switch, the OldSupervisorPassword parameter must also be specified"
+	$ErrorMsg = "When using the SupervisorClear switch, the OldSupervisorPassword or SupervisorPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
@@ -268,9 +300,9 @@ if (($PowerOnChange) -and !($PowerOnPassword -and $OldPowerOnPassword))
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($PowerOnClear) -and !($OldPowerOnPassword))
+if (($PowerOnClear) -and !($OldPowerOnPassword -or $PowerOnPassword))
 {
-	$ErrorMsg = "When using the PowerOnClear switch, the OldPowerOnPassword parameter must also be specified"
+	$ErrorMsg = "When using the PowerOnClear switch, the OldPowerOnPassword or PowerOnPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
@@ -333,6 +365,7 @@ if (($SMSTSPasswordRetry) -and !(Get-TaskSequenceStatus))
 	Write-LogEntry -Value "The SMSTSPasswordRetry parameter was specifed while not running in a task sequence. Setting SMSTSPasswordRetry to false." -Severity 2
 	$SMSTSPasswordRetry = 0
 }
+Write-LogEntry -Value "Parameter validation completed" -Severity 1
 
 #Set variables from a previous script session
 if (Get-TaskSequenceStatus)
@@ -359,10 +392,6 @@ if (Get-TaskSequenceStatus)
 		Write-LogEntry -Value "Previous unsuccessful power on password clear attempt detected" -Severity 1
 	}
 }
-
-#Get the current password status
-Write-LogEntry -Value "Get the current password state and validate the specified password is not blank" -Severity 1
-$PasswordStatus = $PasswordSettings.PasswordState
 
 #Attempting to set or clear a supervisor password when no supervisor password currently exists
 if ((($PasswordStatus -eq 0) -or ($PasswordStatus -eq 1) -or ($PasswordStatus -eq 4) -or ($PasswordStatus -eq 5)))
@@ -455,23 +484,36 @@ if (($PasswordStatus -eq 2) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 
 			$TSEnv.Value("LenovoClearSupervisor") = "Failed"
 		}
 
-		$Counter = 0
-		While($Counter -lt $OldSupervisorPassword.Count){
-			if ($PasswordSet.SetBiosPassword("pap,$($OldSupervisorPassword[$Counter]),,ascii,us").Return -eq "Success")
+		if ($PasswordSet.SetBiosPassword("pap,$SupervisorPassword,,ascii,us").Return -eq "Success")
+		{
+			#Successfully cleared the password
+			$SupervisorPWClear = "Success"
+			if (Get-TaskSequenceStatus)
 			{
-				#Successfully cleared the password
-				$SupervisorPWClear = "Success"
-				if (Get-TaskSequenceStatus)
-				{
-					$TSEnv.Value("LenovoClearSupervisor") = "Success"
-				}
-				Write-LogEntry -Value "The supervisor password has been successfully cleared" -Severity 1
-				break
+				$TSEnv.Value("LenovoClearSupervisor") = "Success"
 			}
-			else
-			{
-				#Failed to clear the password
-				$Counter++
+			Write-LogEntry -Value "The supervisor password has been successfully cleared" -Severity 1
+		}
+		elseif ($OldSupervisorPassword)
+		{
+			$Counter = 0
+			While($Counter -lt $OldSupervisorPassword.Count){
+				if ($PasswordSet.SetBiosPassword("pap,$($OldSupervisorPassword[$Counter]),,ascii,us").Return -eq "Success")
+				{
+					#Successfully cleared the password
+					$SupervisorPWClear = "Success"
+					if (Get-TaskSequenceStatus)
+					{
+						$TSEnv.Value("LenovoClearSupervisor") = "Success"
+					}
+					Write-LogEntry -Value "The supervisor password has been successfully cleared" -Severity 1
+					break
+				}
+				else
+				{
+					#Failed to clear the password
+					$Counter++
+				}
 			}
 		}
 		if ($SupervisorPWClear -eq "Failed")
@@ -542,23 +584,36 @@ if (($PasswordStatus -eq 1) -or ($PasswordStatus -eq 3) -or($PasswordStatus -eq 
 			$TSEnv.Value("LenovoClearPowerOn") = "Failed"
 		}
 
-		$Counter = 0
-		While($Counter -lt $OldPowerOnPassword.Count){
-			if ($PasswordSet.SetBiosPassword("pop,$($OldPowerOnPassword[$Counter]),,ascii,us").Return -eq "Success")
+		if ($PasswordSet.SetBiosPassword("pop,$PowerOnPassword,,ascii,us").Return -eq "Success")
+		{
+			#Successfully cleared the password
+			$PowerOnPWClear = "Success"
+			if (Get-TaskSequenceStatus)
 			{
-				#Successfully cleared the password
-				$PowerOnPWClear = "Success"
-				if (Get-TaskSequenceStatus)
-				{
-					$TSEnv.Value("LenovoClearPowerOn") = "Success"
-				}
-				Write-LogEntry -Value "The power on password has been successfully cleared" -Severity 1
-				break
+				$TSEnv.Value("LenovoClearPowerOn") = "Success"
 			}
-			else
-			{
-				#Failed to clear the password
-				$Counter++
+			Write-LogEntry -Value "The power on password has been successfully cleared" -Severity 1
+		}
+		elseif ($OldPowerOnPassword)
+		{
+			$Counter = 0
+			While($Counter -lt $OldPowerOnPassword.Count){
+				if ($PasswordSet.SetBiosPassword("pop,$($OldPowerOnPassword[$Counter]),,ascii,us").Return -eq "Success")
+				{
+					#Successfully cleared the password
+					$PowerOnPWClear = "Success"
+					if (Get-TaskSequenceStatus)
+					{
+						$TSEnv.Value("LenovoClearPowerOn") = "Success"
+					}
+					Write-LogEntry -Value "The power on password has been successfully cleared" -Severity 1
+					break
+				}
+				else
+				{
+					#Failed to clear the password
+					$Counter++
+				}
 			}
 		}
 		if ($PowerOnPWClear -eq "Failed")
@@ -626,6 +681,7 @@ if ((($SupervisorPWExists -eq "Failed") -or ($SupervisorPWChange -eq "Failed") -
 	{
 		Write-LogEntry -Value "Failures detected, exiting the script" -Severity 3
 		Write-Output "Password management tasks failed. Check the log file for more information"
+		Write-LogEntry -Value "END - Lenovo BIOS password management script" -Severity 1
 		Exit 1
 	}
 	else

@@ -11,7 +11,10 @@
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
         Reference: https://www.configjon.com/lenovo-bios-settings-management/
-        Modified: 8/1/2019
+        Modified: 11/04/2019
+
+    .CHANGELOG
+        11/04/2019 - Added additional logging. Changed the default log path to $ENV:ProgramData\BiosScripts\Lenovo.
 #>
 
 #Parameters ===================================================================================================================
@@ -153,42 +156,42 @@ Function Write-LogEntry
 		[ValidateNotNullOrEmpty()]
 		[string]$FileName = "Manage-LenovoBiosSettings.log"
 	)
-	# Determine log file location
-	$LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
+    # Determine log file location
+    $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
 		
-	# Construct time stamp for log entry
+    # Construct time stamp for log entry
     if (-not(Test-Path -Path 'variable:global:TimezoneBias'))
     {
-		[string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
+        [string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
         if ($TimezoneBias -match "^-")
         {
-			$TimezoneBias = $TimezoneBias.Replace('-', '+')
-		}
+            $TimezoneBias = $TimezoneBias.Replace('-', '+')
+        }
         else
         {
-			$TimezoneBias = '-' + $TimezoneBias
-		}
-	}
-	$Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
+            $TimezoneBias = '-' + $TimezoneBias
+        }
+    }
+    $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
 		
-	# Construct date for log entry
-	$Date = (Get-Date -Format "MM-dd-yyyy")
+    # Construct date for log entry
+    $Date = (Get-Date -Format "MM-dd-yyyy")
 		
-	# Construct context for log entry
-	$Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
+    # Construct context for log entry
+    $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
 		
-	# Construct final log entry
-	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-LenovoBiosSettings"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
+    # Construct final log entry
+    $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-LenovoBiosSettings"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
 		
-	# Add value to log file
+    # Add value to log file
     try
     {
-		Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
-	}
+        Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
+    }
     catch [System.Exception]
     {
-		Write-Warning -Message "Unable to append log entry to $FileName file. Error message at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)"
-	}
+        Write-Warning -Message "Unable to append log entry to $FileName file. Error message at line $($_.InvocationInfo.ScriptLineNumber): $($_.Exception.Message)"
+    }
 }
 
 #Main program =================================================================================================================
@@ -201,7 +204,7 @@ if (Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:SystemRoot\Temp\LenovoBiosScripts"
+	$LogsDirectory = "$ENV:ProgramData\BiosScripts\Lenovo"
 	if (!(Test-Path -PathType Container $LogsDirectory))
 	{
 		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
@@ -211,6 +214,7 @@ Write-Output "Log path set to $LogsDirectory\Manage-LenovoBiosSettings.log"
 Write-LogEntry -Value "START - Lenovo BIOS settings management script" -Severity 1
 
 #Connect to the Lenovo_BiosSetting WMI class
+$Error.Clear()
 try
 {
     Write-LogEntry -Value "Connect to the Lenovo_BiosSetting WMI class" -Severity 1
@@ -221,8 +225,13 @@ catch
     Write-LogEntry -Value "Unable to connect to the Lenovo_BiosSetting WMI class" -Severity 3
     throw "Unable to connect to the Lenovo_BiosSetting WMI class"
 }
+if (!($Error))
+{
+	Write-LogEntry -Value "Successfully connected to the Lenovo_BiosSetting WMI class" -Severity 1
+}
 
 #Connect to the Lenovo_SetBiosSetting WMI class
+$Error.Clear()
 try
 {
     Write-LogEntry -Value "Connect to the Lenovo_SetBiosSetting WMI class" -Severity 1
@@ -233,8 +242,13 @@ catch
     Write-LogEntry -Value "Unable to connect to the Lenovo_SetBiosSetting WMI class" -Severity 3
     throw "Unable to connect to the Lenovo_SetBiosSetting WMI class"
 }
+if (!($Error))
+{
+	Write-LogEntry -Value "Successfully connected to the Lenovo_SetBiosSetting WMI class" -Severity 1
+}
 
 #Connect to the Lenovo_SaveBiosSettings WMI class
+$Error.Clear()
 try
 {
     Write-LogEntry -Value "Connect to the Lenovo_SaveBiosSettings WMI class" -Severity 1
@@ -245,8 +259,13 @@ catch
     Write-LogEntry -Value "Unable to connect to the Lenovo_SaveBiosSettings WMI class" -Severity 3
     throw "Unable to connect to the Lenovo_SaveBiosSettings WMI class"
 }
+if (!($Error))
+{
+	Write-LogEntry -Value "Successfully connected to the Lenovo_SaveBiosSettings WMI class" -Severity 1
+}
 
 #Connect to the Lenovo_BiosPasswordSettings WMI class
+$Error.Clear()
 try
 {
 	Write-LogEntry -Value "Connect to the Lenovo_BiosPasswordSettings WMI class" -Severity 1
@@ -257,8 +276,13 @@ catch
 	Write-LogEntry -Value "Unable to connect to the Lenovo_BiosPasswordSettings WMI class" -Severity 3
 	throw "Unable to connect to the Lenovo_BiosPasswordSettings WMI class"
 }
+if (!($Error))
+{
+	Write-LogEntry -Value "Successfully connected to the Lenovo_BiosPasswordSettings WMI class" -Severity 1
+}
 
 #Connect to the Lenovo_SetBiosPassword WMI class
+$Error.Clear()
 try
 {
 	Write-LogEntry -Value "Connect to the Lenovo_SetBiosPassword WMI class" -Severity 1
@@ -268,6 +292,10 @@ catch
 {
 	Write-LogEntry -Value "Unable to connect to the Lenovo_SetBiosPassword WMI class" -Severity 3
 	throw "Unable to connect to the Lenovo_BiosPasswordSettings WMI class"
+}
+if (!($Error))
+{
+	Write-LogEntry -Value "Successfully connected to the Lenovo_SetBiosPassword WMI class" -Severity 1
 }
 
 #BIOS password checks
@@ -333,8 +361,12 @@ if ($SuccessSet -gt 0)
 
 #Display results
 Write-Output "$AlreadySet settings already set correctly"
+Write-LogEntry -Value "$AlreadySet settings already set correctly" -Severity 1
 Write-Output "$SuccessSet settings successfully set"
+Write-LogEntry -Value "$SuccessSet settings successfully set" -Severity 1
 Write-Output "$FailSet settings failed to set"
+Write-LogEntry -Value "$FailSet settings failed to set" -Severity 3
 Write-Output "$NotFound settings not found"
+Write-LogEntry -Value "$NotFound settings not found" -Severity 2
 Write-Output "Lenovo BIOS settings Management completed. Check the log file for more information"
 Write-LogEntry -Value "END - Lenovo BIOS settings management script" -Severity 1

@@ -6,10 +6,10 @@
 		Specify this switch to set a new setup password when no password currently exists
 
 	.PARAMETER SetupChange
-		Specify this switch to change an existing Setup password. Must also specify the SetupPassword and OldSetupPassword parameters.
+		Specify this switch to change an existing setup password. Must also specify the SetupPassword and OldSetupPassword parameters.
 
 	.PARAMETER SetupClear
-		Specify this swtich to clear an existing Setup password. Must also specify the OldSetupPassword parameter.
+		Specify this swtich to clear an existing setup password. Must also specify the OldSetupPassword parameter.
 
 	.PARAMETER PowerOnSet
 		Specify this switch to set a new power on password when no password currently exists
@@ -21,10 +21,10 @@
 		Specify this switch to clear an existing power on password. Must also specify the OldPowerOnPassword parameter.
 
 	.PARAMETER SetupPassword
-		Specify the new Setup password to set.
+		Specify the new setup password to set.
 
 	.PARAMETER OldSetupPassword
-		Specify the old Setup password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
+		Specify the old setup password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
 
 	.PARAMETER PowerOnPassword
 		Specify the new power on password to set.
@@ -45,17 +45,20 @@
 		Set a new setup password
 		Manage-HPBiosPasswords.ps1 -SetupSet -SetupPassword <String>
 	
-		Change an existing setup password
-		Manage-HPBiosPasswords.ps1 -SetupChange -SetupPassword <String> -OldSetupPassword <String1>,<String2>
-
-		Clear an existing setup password
-		Manage-HPBiosPasswords.ps1 -SetupClear -OldSetupPassword <String1>,<String2>
-
-		Set a new setup password and change an existing setup password
+		Set or change a setup password
 		Manage-HPBiosPasswords.ps1 -SetupSet -SetupChange -SetupPassword <String> -OldSetupPassword <String1>,<String2>
 
-		Change an existing Setup password and clear a power on password
-		Manage-HPBiosPasswords.ps1 -SetupChange -SetupPassword <String> -OldSetupPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
+		Clear an existing setup password when a single password exists
+		Manage-HPBiosPasswords.ps1 -SetupClear -SetupPassword <String1>
+
+		Clear an existing setup password when multiple passwords exist
+		Manage-HPBiosPasswords.ps1 -SetupClear -OldSetupPassword <String1>,<String2>
+
+		Set a new setup password and set a new power on password
+		Manage-HPBiosPasswords.ps1 -SetupSet -PowerOnSet -SetupPassword <String1> -PowerOnPassword <String1>
+
+		Set or change an existing setup password and clear a power on password
+		Manage-HPBiosPasswords.ps1 -SetupSet -SetupChange -SetupPassword <String> -OldSetupPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
 
 		Clear existing Setup and power on passwords
 		Manage-HPBiosPasswords.ps1 -SetupClear -OldSetupPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
@@ -66,11 +69,13 @@
 	.NOTES
 		Created by: Jon Anderson (@ConfigJon)
 		Reference:
-		Modifed: 7/27/2019
+		Modifed: 11/04/2019
 
 	.CHANGELOG
 		07/27/19 - Formatting changes. Changed the SMSTSPasswordRetry parameter to be a switch instead of an integer value. Changed the SMSTSChangeSetup TS variable to HPChangeSetup.
-					Changed the SMSTSClearSetup TS variable to HPClearSetup. Changed the SMSTSChangePowerOn TS variable to HPChangePowerOn. Changed the SMSTSClearPowerOn TS variable to HPClearPowerOn.
+				   Changed the SMSTSClearSetup TS variable to HPClearSetup. Changed the SMSTSChangePowerOn TS variable to HPChangePowerOn. Changed the SMSTSClearPowerOn TS variable to HPClearPowerOn.
+		11/04/19 - Added additional logging. Changed the default log path to $ENV:ProgramData\BiosScripts\HP. Modifed the parameter validation logic.
+				   Added logic to allow for the SetupPassword and PowerOnPassword parameters to be used when clearing a password.
 #>
 
 #Parameters ===================================================================================================================
@@ -204,7 +209,7 @@ if (Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:SystemRoot\Temp\HPBiosScripts"
+	$LogsDirectory = "$ENV:ProgramData\BiosScripts\HP"
 	if (!(Test-Path -PathType Container $LogsDirectory))
 	{
 		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
@@ -214,6 +219,7 @@ Write-Output "Log path set to $LogsDirectory\Manage-HPBiosPasswords.log"
 Write-LogEntry -Value "START - HP BIOS password management script" -Severity 1
 
 #Connect to the HP_BIOSSettingInterface WMI class
+$Error.Clear()
 try
 {
     Write-LogEntry -Value "Connect to the HP_BIOSSettingInterface WMI class" -Severity 1
@@ -224,8 +230,13 @@ catch
     Write-LogEntry -Value "Unable to connect to the HP_BIOSSettingInterface WMI class" -Severity 3
     throw "Unable to connect to the HP_BIOSSettingInterface WMI class"
 }
+if (!($Error))
+{
+	Write-LogEntry -Value "Successfully connected to the HP_BIOSSettingInterface WMI class" -Severity 1
+}	
 
 #Connect to the HP_BIOSSetting WMI class
+$Error.Clear()
 try
 {
     Write-LogEntry -Value "Connect to the HP_BIOSSetting WMI class" -Severity 1
@@ -236,11 +247,33 @@ catch
     Write-LogEntry -Value "Unable to connect to the HP_BIOSSetting WMI class" -Severity 3
     throw "Unable to connect to the HP_BIOSSetting WMI class"
 }
+if (!($Error))
+{
+	Write-LogEntry -Value "Successfully connected to the HP_BIOSSetting WMI class" -Severity 1
+}	
 
 #Get the current password status
 Write-LogEntry -Value "Get the current password state" -Severity 1
+
 $SetupPasswordCheck = ($HPBiosSetting | Where-Object Name -eq "Setup Password").IsSet
+if ($SetupPasswordCheck -eq 1)
+{
+	Write-LogEntry -Value "The setup password is currently set" -Severity 1
+}
+else
+{
+	Write-LogEntry -Value "The setup password is not currently set" -Severity 1
+}
+
 $PowerOnPasswordCheck = ($HPBiosSetting | Where-Object Name -eq "Power-On Password").IsSet
+if ($PowerOnPasswordCheck -eq 1)
+{
+	Write-LogEntry -Value "The power on password is currently set" -Severity 1
+}
+else
+{
+	Write-LogEntry -Value "The power on password is not currently set" -Severity 1
+}
 
 #Parameter validation
 Write-LogEntry -Value "Begin parameter validation" -Severity 1
@@ -251,15 +284,15 @@ if (($SetupChange) -and !($SetupPassword -and $OldSetupPassword))
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($SetupSet) -and ($SetupPasswordCheck -eq 0) -and !($SetupPassword))
+if (($SetupSet) -and !($SetupPassword))
 {
 	$ErrorMsg = "When using the SetupSet switch, the SetupPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($SetupClear) -and !($OldSetupPassword))
+if (($SetupClear) -and !($SetupPassword -or $OldSetupPassword))
 {
-	$ErrorMsg = "When using the SetupClear switch, the OldSetupPassword parameter must also be specified"
+	$ErrorMsg = "When using the SetupClear switch, the SetupPassword or OldSetupPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
@@ -281,9 +314,9 @@ if (($PowerOnSet) -and !($SetupPassword) -and ($SetupPasswordCheck -eq 1))
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($PowerOnClear) -and !($OldPowerOnPassword))
+if (($PowerOnClear) -and !($PowerOnPassword -or $OldPowerOnPassword))
 {
-	$ErrorMsg = "When using the PowerOnClear switch, the OldPowerOnPassword parameter must also be specified"
+	$ErrorMsg = "When using the PowerOnClear switch, the PowerOnPassword or OldPowerOnPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
@@ -328,6 +361,7 @@ if (($SMSTSPasswordRetry) -and !(Get-TaskSequenceStatus))
 	Write-LogEntry -Value "The SMSTSPasswordRetry parameter was specifed while not running in a task sequence. Setting SMSTSPasswordRetry to false." -Severity 2
 	$SMSTSPasswordRetry = $False
 }
+Write-LogEntry -Value "Parameter validation completed" -Severity 1
 
 #Set variables from a previous script session
 if (Get-TaskSequenceStatus)
@@ -336,12 +370,12 @@ if (Get-TaskSequenceStatus)
 	$HPChangeSetup = $TSEnv.Value("HPChangeSetup")
 	if ($HPChangeSetup -eq "Failed")
 	{
-		Write-LogEntry -Value "Previous unsuccessful Setup password change attempt detected" -Severity 1
+		Write-LogEntry -Value "Previous unsuccessful setup password change attempt detected" -Severity 1
 	}
 	$HPClearSetup = $TSEnv.Value("HPClearSetup")
 	if ($HPClearSetup -eq "Failed")
 	{
-		Write-LogEntry -Value "Previous unsuccessful Setup password clear attempt detected" -Severity 1
+		Write-LogEntry -Value "Previous unsuccessful setup password clear attempt detected" -Severity 1
 	}
 	$HPChangePowerOn = $TSEnv.Value("HPChangePowerOn")
 	if ($HPChangePowerOn -eq "Failed")
@@ -472,24 +506,37 @@ if ($SetupPasswordCheck -eq 1)
 			$TSEnv.Value("HPClearSetup") = "Failed"
 		}
 
-		$Counter = 0
-		While($Counter -lt $OldSetupPassword.Count){
-			if (($Interface.SetBIOSSetting("Setup Password","<utf-16/>","<utf-16/>" + $OldSetupPassword[$Counter])).Return -eq 0)
+		if (($Interface.SetBIOSSetting("Setup Password","<utf-16/>","<utf-16/>" + $SetupPassword)).Return -eq 0)
+		{
+			#Successfully cleared the password
+			$SetupPWClear = "Success"
+			if (Get-TaskSequenceStatus)
 			{
-				#Successfully cleared the password
-				$SetupPWClear = "Success"
-				if (Get-TaskSequenceStatus)
+				$TSEnv.Value("HPClearSetup") = "Success"
+			}
+			Write-LogEntry -Value "The setup password has been successfully cleared" -Severity 1
+		}
+		elseif ($OldSetupPassword)
+		{
+			$Counter = 0
+			While($Counter -lt $OldSetupPassword.Count){
+				if (($Interface.SetBIOSSetting("Setup Password","<utf-16/>","<utf-16/>" + $OldSetupPassword[$Counter])).Return -eq 0)
 				{
-					$TSEnv.Value("HPClearSetup") = "Success"
+					#Successfully cleared the password
+					$SetupPWClear = "Success"
+					if (Get-TaskSequenceStatus)
+					{
+						$TSEnv.Value("HPClearSetup") = "Success"
+					}
+					Write-LogEntry -Value "The setup password has been successfully cleared" -Severity 1
+					break
 				}
-				Write-LogEntry -Value "The setup password has been successfully cleared" -Severity 1
-				break
-			}
-			else
-			{
-				#Failed to clear the password
-				$Counter++
-			}
+				else
+				{
+					#Failed to clear the password
+					$Counter++
+				}
+			}	
 		}
 		if ($SetupPWClear -eq "Failed")
 		{
@@ -559,24 +606,37 @@ if ($PowerOnPasswordCheck -eq 1)
 			$TSEnv.Value("HPClearPowerOn") = "Failed"
 		}
 
-		$Counter = 0
-		While($Counter -lt $OldPowerOnPassword.Count){
-			if (($Interface.SetBIOSSetting("Power-On Password","<utf-16/>","<utf-16/>" + $OldPowerOnPassword[$Counter])).Return -eq 0)
+		if (($Interface.SetBIOSSetting("Power-On Password","<utf-16/>","<utf-16/>" + $PowerOnPassword)).Return -eq 0)
+		{
+			#Successfully cleared the password
+			$PowerOnPWClear = "Success"
+			if (Get-TaskSequenceStatus)
 			{
-				#Successfully cleared the password
-				$PowerOnPWClear = "Success"
-				if (Get-TaskSequenceStatus)
+				$TSEnv.Value("HPClearPowerOn") = "Success"
+			}
+			Write-LogEntry -Value "The power on password has been successfully cleared" -Severity 1
+		}
+		elseif ($OldPowerOnPassword)
+		{
+			$Counter = 0
+			While($Counter -lt $OldPowerOnPassword.Count){
+				if (($Interface.SetBIOSSetting("Power-On Password","<utf-16/>","<utf-16/>" + $OldPowerOnPassword[$Counter])).Return -eq 0)
 				{
-					$TSEnv.Value("HPClearPowerOn") = "Success"
+					#Successfully cleared the password
+					$PowerOnPWClear = "Success"
+					if (Get-TaskSequenceStatus)
+					{
+						$TSEnv.Value("HPClearPowerOn") = "Success"
+					}
+					Write-LogEntry -Value "The power on password has been successfully cleared" -Severity 1
+					break
 				}
-				Write-LogEntry -Value "The power on password has been successfully cleared" -Severity 1
-				break
-			}
-			else
-			{
-				#Failed to clear the password
-				$Counter++
-			}
+				else
+				{
+					#Failed to clear the password
+					$Counter++
+				}
+			}			
 		}
 		if ($PowerOnPWClear -eq "Failed")
 		{
@@ -627,6 +687,7 @@ if ((($SetupPWExists -eq "Failed") -or ($SetupPWChange -eq "Failed") -or ($Setup
 	{
 		Write-LogEntry -Value "Failures detected, exiting the script" -Severity 3
 		Write-Output "Password management tasks failed. Check the log file for more information"
+		Write-LogEntry -Value "END - HP BIOS password management script" -Severity 1
 		Exit 1
 	}
 	else
