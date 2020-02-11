@@ -3,19 +3,13 @@
 		Automatically configure Dell BIOS passwords and prompt the user if manual intervention is required.
 
 	.PARAMETER AdminSet
-		Specify this switch to set a new admin password when no password currently exists
-
-	.PARAMETER AdminChange
-		Specify this switch to change an existing admin password (implies the AdminSet switch). Must also specify the AdminPassword and OldAdminPassword parameters.
+		Specify this switch to set a new admin password or change an existing admin password.
 
 	.PARAMETER AdminClear
 		Specify this swtich to clear an existing admin password. Must also specify the OldAdminPassword parameter.
 
 	.PARAMETER SystemSet
-		Specify this switch to set a new system password when no password currently exists
-
-	.PARAMETER SystemChange
-		Specify this switch to change an existing system password (implies the SystemSet switch). Must also specify the SystemPassword and OldSystemPassword parameters.
+		Specify this switch to set a new system password or change an existing setup password.
 
 	.PARAMETER SystemClear
 		Specify this switch to clear an existing system password. Must also specify the OldSystemPassword parameter.
@@ -46,12 +40,9 @@
 		Manage-DellBiosPasswords.ps1 -AdminSet -AdminPassword <String>
 	
 		Set or change a admin password
-		Manage-DellBiosPasswords.ps1 -AdminSet -AdminChange -AdminPassword <String> -OldAdminPassword <String1>,<String2>,<String3>
+		Manage-DellBiosPasswords.ps1 -AdminSet -AdminPassword <String> -OldAdminPassword <String1>,<String2>,<String3>
 
-		Clear an existing admin password when a single password exists
-		Manage-DellBiosPasswords.ps1 -AdminClear -AdminPassword <String>
-
-		Clear an existing admin password when multiple passwords exist
+		Clear existing admin password(s)
 		Manage-DellBiosPasswords.ps1 -AdminClear -OldAdminPassword <String1>,<String2>,<String3>
 
 		Set a new admin password and set a new system password
@@ -60,17 +51,19 @@
 	.NOTES
 		Created by: Jon Anderson (@ConfigJon)
 		Reference: https://www.configjon.com/dell-bios-password-management/
-		Modified: 11/03/2019
+		Modified: 01/30/2020
+
+	.CHANGELOG
+		01/30/2020 - Removed the AdminChange and SystemChange parameters. AdminSet and SystemSet now work to set or change a password. Changed the DellChangeAdmin task sequence variable to DellSetAdmin.
+					 Changed the DellChangeSystem task sequence variable to DellSetSystem. Updated the parameter validation checks.
 #>
 
 #Parameters ===================================================================================================================
 
 param(
 	[Parameter(Mandatory=$false)][Switch]$AdminSet,
-	[Parameter(Mandatory=$false)][Switch]$AdminChange,
 	[Parameter(Mandatory=$false)][Switch]$AdminClear,
 	[Parameter(Mandatory=$false)][Switch]$SystemSet,
-	[Parameter(Mandatory=$false)][Switch]$SystemChange,
 	[Parameter(Mandatory=$false)][Switch]$SystemClear,
 	[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$AdminPassword,
 	[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$OldAdminPassword,
@@ -298,27 +291,21 @@ else
 #Parameter validation
 Write-LogEntry -Value "Begin parameter validation" -Severity 1
 
-if (($AdminChange) -and !($AdminPassword -and $OldAdminPassword))
-{
-	$ErrorMsg = "When using the AdminChange switch, the AdminPassword and OldAdminPassword parameters must also be specified"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
-}
 if (($AdminSet) -and !($AdminPassword))
 {
 	$ErrorMsg = "When using the AdminSet switch, the AdminPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($AdminClear) -and !($AdminPassword -or $OldAdminPassword))
+if (($AdminSet -and $AdminPasswordCheck -eq 1) -and !($OldAdminPassword))
 {
-	$ErrorMsg = "When using the AdminClear switch, the AdminPassword or OldAdminPassword parameter must also be specified"
+	$ErrorMsg = "When using the AdminSet switch where a admin password exists, the OldAdminPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($SystemChange) -and !($SystemPassword -and $OldSystemPassword))
+if (($AdminClear) -and !($OldAdminPassword))
 {
-	$ErrorMsg = "When using the SystemChange switch, the SystemPassword and OldSystemPassword parameters must also be specified"
+	$ErrorMsg = "When using the AdminClear switch, the OldAdminPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
@@ -328,51 +315,51 @@ if (($SystemSet) -and !($SystemPassword))
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($SystemClear) -and !($SystemPassword -or $OldSystemPassword))
+if (($SystemSet -and $SystemPasswordCheck -eq 1) -and !($OldSystemPassword))
 {
-	$ErrorMsg = "When using the SystemClear switch, the SystemPassword or OldSystemPassword parameter must also be specified"
+	$ErrorMsg = "When using the SystemSet switch where a system password exists, the OldSystemPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($AdminChange -or $AdminSet) -and ($AdminClear))
-{
-	$ErrorMsg = "Cannot specify the AdminChange or AdminSet and AdminClear parameters simultaneously"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
-}
-if (($SystemChange -or $SystemSet) -and ($SystemClear))
-{
-	$ErrorMsg = "Cannot specify the SystemChange or SystemSet and SystemClear parameters simultaneously"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
-}
-if (($SystemSet) -and ($AdminPasswordCheck -eq "True") -and !($AdminPassword))
+if (($SystemSet -and $AdminPasswordCheck -eq "True") -and !($AdminPassword))
 {
 	$ErrorMsg = "When attempting to set a system password while the admin password is already set, the AdminPassword parameter must be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($OldAdminPassword) -and !($AdminChange -or $AdminClear))
+if (($SystemClear) -and !($OldSystemPassword))
 {
-	$ErrorMsg = "When using the OldAdminPassword parameter, one of the AdminChange or AdminClear parameters must also be specified"
+	$ErrorMsg = "When using the SystemClear switch, the OldSystemPassword parameter must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($AdminPassword) -and !($AdminSet -or $AdminChange -or $AdminClear -or $SystemSet))
+if (($AdminSet) -and ($AdminClear))
 {
-	$ErrorMsg = "When using the AdminPassword parameter, one of the AdminSet or AdminChange or AdminClear or SystemSet parameters must also be specified"
+	$ErrorMsg = "Cannot specify the AdminSet and AdminClear parameters simultaneously"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($OldSystemPassword) -and !($SystemChange -or $SystemClear))
+if (($SystemSet) -and ($SystemClear))
 {
-	$ErrorMsg = "When using the OldSystemPassword parameter, one of the SystemChange or SystemClear parameters must also be specified"
+	$ErrorMsg = "Cannot specify the SystemSet and SystemClear parameters simultaneously"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
-if (($SystemPassword) -and !($SystemSet -or $SystemChange -or $SystemClear))
+if (($OldAdminPassword) -and !($AdminSet -or $AdminClear))
 {
-	$ErrorMsg = "When using the SystemPassword parameter, one of the SystemSet or SystemChange or SystemClear parameters must also be specified"
+	$ErrorMsg = "When using the OldAdminPassword parameter, one of the AdminSet or AdminClear parameters must also be specified"
+	Write-LogEntry -Value $ErrorMsg -Severity 3
+	throw $ErrorMsg
+}
+if (($AdminPassword) -and !($AdminSet -or $AdminClear -or $SystemSet))
+{
+	$ErrorMsg = "When using the AdminPassword parameter, one of the AdminSet or AdminClear or SystemSet parameters must also be specified"
+	Write-LogEntry -Value $ErrorMsg -Severity 3
+	throw $ErrorMsg
+}
+if (($OldSystemPassword -or $SystemPassword) -and !($SystemSet -or $SystemClear))
+{
+	$ErrorMsg = "When using the OldSystemPassword or SystemPassword parameters, one of the SystemSet or SystemClear parameters must also be specified"
 	Write-LogEntry -Value $ErrorMsg -Severity 3
 	throw $ErrorMsg
 }
@@ -391,20 +378,20 @@ Write-LogEntry -Value "Parameter validation completed" -Severity 1
 if (Get-TaskSequenceStatus)
 {
 	Write-LogEntry -Value "Check for existing task sequence variables" -Severity 1
-	$DellChangeAdmin = $TSEnv.Value("DellChangeAdmin")
-	if ($DellChangeAdmin -eq "Failed")
+	$DellSetAdmin = $TSEnv.Value("DellSetAdmin")
+	if ($DellSetAdmin -eq "Failed")
 	{
-		Write-LogEntry -Value "Previous unsuccessful admin password change attempt detected" -Severity 1
+		Write-LogEntry -Value "Previous unsuccessful admin password set attempt detected" -Severity 1
 	}
 	$DellClearAdmin = $TSEnv.Value("DellClearAdmin")
 	if ($DellClearAdmin -eq "Failed")
 	{
 		Write-LogEntry -Value "Previous unsuccessful admin password clear attempt detected" -Severity 1
 	}
-	$DellChangeSystem = $TSEnv.Value("DellChangeSystem")
-	if ($DellChangeSystem -eq "Failed")
+	$DellSetSystem = $TSEnv.Value("DellSetSystem")
+	if ($DellSetSystem -eq "Failed")
 	{
-		Write-LogEntry -Value "Previous unsuccessful system password change attempt detected" -Severity 1
+		Write-LogEntry -Value "Previous unsuccessful system password set attempt detected" -Severity 1
 	}
 	$DellClearSystem = $TSEnv.Value("DellClearSystem")
 	if ($DellClearSystem -eq "Failed")
@@ -499,13 +486,13 @@ if ($SystemPasswordCheck -eq "False")
 if ($AdminPasswordCheck -eq "True")
 {
 	#Change the existing admin password
-	if (($AdminChange) -and ($DellChangeAdmin -ne "Success"))
+	if (($AdminSet) -and ($DellSetAdmin -ne "Success"))
 	{
 		Write-LogEntry -Value "Attempt to change the existing admin password" -Severity 1
-		$AdminPWChange = "Failed"
+		$AdminPWSet = "Failed"
 		if (Get-TaskSequenceStatus)
 		{
-			$TSEnv.Value("DellChangeAdmin") = "Failed"
+			$TSEnv.Value("DellSetAdmin") = "Failed"
 		}
         
 		try
@@ -530,16 +517,16 @@ if ($AdminPasswordCheck -eq "True")
 				if (!($Error))
 				{
 					#Successfully changed the password
-					$AdminPWChange = "Success"
+					$AdminPWSet = "Success"
 					if (Get-TaskSequenceStatus)
 					{
-						$TSEnv.Value("DellChangeAdmin") = "Success"
+						$TSEnv.Value("DellSetAdmin") = "Success"
 					}
 					Write-LogEntry -Value "The admin password has been successfully changed" -Severity 1
 					break
 				}
 			}
-			if ($AdminPWChange -eq "Failed")
+			if ($AdminPWSet -eq "Failed")
 			{
 				Write-LogEntry -Value "Failed to change the admin password" -Severity 3
 			}
@@ -547,10 +534,10 @@ if ($AdminPasswordCheck -eq "True")
 		if (!($AdminSetFail))
 		{
 			#Password already correct
-			$AdminPWChange = "Success"
+			$AdminPWSet = "Success"
 			if (Get-TaskSequenceStatus)
 			{
-				$TSEnv.Value("DellChangeAdmin") = "Success"
+				$TSEnv.Value("DellSetAdmin") = "Success"
 			}
 			Write-LogEntry -Value "The admin password is already set correctly" -Severity 1
 		}
@@ -566,68 +553,40 @@ if ($AdminPasswordCheck -eq "True")
 			$TSEnv.Value("DellClearAdmin") = "Failed"
 		}
 		
-		try
-		{
-			Set-Item -Path DellSmbios:\Security\AdminPassword "" -Password $AdminPassword -ErrorAction Stop
-		}
-		catch
-		{
-			$AdminClearFail = $true
-			$Counter = 0
-			if ($OldAdminPassword)
+		$Counter = 0
+		While($Counter -lt $OldAdminPassword.Count){
+			$Error.Clear()
+			try
 			{
-				While($Counter -lt $OldAdminPassword.Count){
-					$Error.Clear()
-					try
-					{
-						Set-Item -Path DellSmbios:\Security\AdminPassword "" -Password $OldAdminPassword[$Counter] -ErrorAction Stop
-					}
-					catch
-					{
-						#Failed to clear the password
-						$Counter++
-					}
-					if (!($Error))
-					{
-						#Successfully cleared the password
-						$AdminPWClear = "Success"
-						if (Get-TaskSequenceStatus)
-						{
-							$TSEnv.Value("DellClearAdmin") = "Success"
-						}
-						if ($SystemPasswordCheck -eq "True")
-						{
-							Write-LogEntry -Value "The admin password and system password have been successfully cleared" -Severity 1
-							break	
-						}
-						else
-						{
-							Write-LogEntry -Value "The admin password has been successfully cleared" -Severity 1
-							break	
-						}
-					}
+				Set-Item -Path DellSmbios:\Security\AdminPassword "" -Password $OldAdminPassword[$Counter] -ErrorAction Stop
+			}
+			catch
+			{
+				#Failed to clear the password
+				$Counter++
+			}
+			if (!($Error))
+			{
+				#Successfully cleared the password
+				$AdminPWClear = "Success"
+				if (Get-TaskSequenceStatus)
+				{
+					$TSEnv.Value("DellClearAdmin") = "Success"
+				}
+				if ($SystemPasswordCheck -eq "True")
+				{
+					Write-LogEntry -Value "The admin password and system password have been successfully cleared" -Severity 1
+					break	
+				}
+				else
+				{
+					Write-LogEntry -Value "The admin password has been successfully cleared" -Severity 1
+					break	
 				}
 			}
 			if ($AdminPWClear -eq "Failed")
 			{
 				Write-LogEntry -Value "Failed to clear the admin password" -Severity 3
-			}
-		}
-		if (!($AdminClearFail))
-		{
-			#Successfully cleared the password
-			$AdminPWClear = "Success"
-			if (Get-TaskSequenceStatus)
-			{
-				$TSEnv.Value("DellClearAdmin") = "Success"
-			}
-			if ($SystemPasswordCheck -eq "True")
-			{
-				Write-LogEntry -Value "The admin password and system password have been successfully cleared" -Severity 1
-			}
-			else
-			{
-				Write-LogEntry -Value "The admin password has been successfully cleared" -Severity 1
 			}
 		}
 	}
@@ -637,13 +596,13 @@ if ($AdminPasswordCheck -eq "True")
 if ($SystemPasswordCheck -eq "True")
 {
 	#Change the existing system password
-	if (($SystemChange) -and ($DellChangeSystem -ne "Success"))
+	if (($SystemSet) -and ($DellSetSystem -ne "Success"))
 	{
 		Write-LogEntry -Value "Attempt to change the existing system password" -Severity 1
-		$SystemPWChange = "Failed"
+		$SystemPWSet = "Failed"
 		if (Get-TaskSequenceStatus)
 		{
-			$TSEnv.Value("DellChangeSystem") = "Failed"
+			$TSEnv.Value("DellSetSystem") = "Failed"
 		}
         
 		try
@@ -654,33 +613,30 @@ if ($SystemPasswordCheck -eq "True")
 		{
 			$SystemSetFail = $true
 			$Counter = 0
-			if ($OldSystemPassword)
-			{
-				While($Counter -lt $OldSystemPassword.Count){
-					$Error.Clear()
-					try
+			While($Counter -lt $OldSystemPassword.Count){
+				$Error.Clear()
+				try
+				{
+					Set-Item -Path DellSmbios:\Security\SystemPassword $SystemPassword -Password $OldSystemPassword[$Counter] -ErrorAction Stop
+				}
+				catch
+				{
+					#Failed to change the password
+					$Counter++
+				}
+				if (!($Error))
+				{
+				#Successfully changed the password
+					$SystemPWSet = "Success"
+					if (Get-TaskSequenceStatus)
 					{
-						Set-Item -Path DellSmbios:\Security\SystemPassword $SystemPassword -Password $OldSystemPassword[$Counter] -ErrorAction Stop
+						$TSEnv.Value("DellSetSystem") = "Success"
 					}
-					catch
-					{
-						#Failed to change the password
-						$Counter++
-					}
-					if (!($Error))
-					{
-					#Successfully changed the password
-						$SystemPWChange = "Success"
-						if (Get-TaskSequenceStatus)
-						{
-							$TSEnv.Value("DellChangeSystem") = "Success"
-						}
-						Write-LogEntry -Value "The system password has been successfully changed" -Severity 1
-						break
-					}
+					Write-LogEntry -Value "The system password has been successfully changed" -Severity 1
+					break
 				}
 			}
-			if ($SystemPWChange -eq "Failed")
+			if ($SystemPWSet -eq "Failed")
 			{
 				Write-LogEntry -Value "Failed to change the system password" -Severity 3
 			}
@@ -688,10 +644,10 @@ if ($SystemPasswordCheck -eq "True")
 		if (!($SystemSetFail))
 		{
 			#Password already correct
-			$SystemPWChange = "Success"
+			$SystemPWSet = "Success"
 			if (Get-TaskSequenceStatus)
 			{
-				$TSEnv.Value("DellChangeSystem") = "Success"
+				$TSEnv.Value("DellSetSystem") = "Success"
 			}
 			Write-LogEntry -Value "The system password is already set correctly" -Severity 1
 		}
@@ -706,58 +662,40 @@ if ($SystemPasswordCheck -eq "True")
 		{
 			$TSEnv.Value("DellClearSystem") = "Failed"
 		}
-		
-		try
-		{
-			Set-Item -Path DellSmbios:\Security\SystemPassword "" -Password $SystemPassword -ErrorAction Stop
-		}
-		catch
-		{
-			$SystemClearFail = $true
-			$Counter = 0
-			While($Counter -lt $OldSystemPassword.Count){
-				$Error.Clear()
-				try
-				{
-					Set-Item -Path DellSmbios:\Security\SystemPassword "" -Password $OldSystemPassword[$Counter] -ErrorAction Stop
-				}
-				catch
-				{
-					#Failed to clear the password
-					$Counter++
-				}
-				if (!($Error))
-				{
-					#Successfully cleared the password
-					$SystemPWClear = "Success"
-					if (Get-TaskSequenceStatus)
-					{
-						$TSEnv.Value("DellClearSystem") = "Success"
-					}
-					Write-LogEntry -Value "The system password has been successfully cleared" -Severity 1
-					break
-				}
-			}
-			if ($SystemPWClear -eq "Failed")
+
+		$Counter = 0
+		While($Counter -lt $OldSystemPassword.Count){
+			$Error.Clear()
+			try
 			{
-				Write-LogEntry -Value "Failed to clear the system password" -Severity 3
+				Set-Item -Path DellSmbios:\Security\SystemPassword "" -Password $OldSystemPassword[$Counter] -ErrorAction Stop
 			}
-		}
-		if (!($SystemClearFail))
-		{
-			#Successfully cleared the password
-			$SystemPWClear = "Success"
-			if (Get-TaskSequenceStatus)
+			catch
 			{
-				$TSEnv.Value("DellClearSystem") = "Success"
+				#Failed to clear the password
+				$Counter++
 			}
-			Write-LogEntry -Value "The system password has been successfully cleared" -Severity 1
+			if (!($Error))
+			{
+				#Successfully cleared the password
+				$SystemPWClear = "Success"
+				if (Get-TaskSequenceStatus)
+				{
+					$TSEnv.Value("DellClearSystem") = "Success"
+				}
+				Write-LogEntry -Value "The system password has been successfully cleared" -Severity 1
+				break
+			}
 		}
-    }
+		if ($SystemPWClear -eq "Failed")
+		{
+			Write-LogEntry -Value "Failed to clear the system password" -Severity 3
+		}
+	}
 }
 
 #Prompt the user about any failures
-if ((($AdminPWExists -eq "Failed") -or ($AdminPWChange -eq "Failed") -or ($AdminPWClear -eq "Failed") -or ($SystemPWExists -eq "Failed") -or ($SystemPWChange -eq "Failed") -or ($SystemPWClear -eq "Failed") -or ($SystemAlreadySet -eq "Failed")) -and (!($SMSTSPasswordRetry)))
+if ((($AdminPWExists -eq "Failed") -or ($AdminPWSet -eq "Failed") -or ($AdminPWClear -eq "Failed") -or ($SystemPWExists -eq "Failed") -or ($SystemPWSet -eq "Failed") -or ($SystemPWClear -eq "Failed") -or ($SystemAlreadySet -eq "Failed")) -and (!($SMSTSPasswordRetry)))
 {
 	if (!($NoUserPrompt))
 	{
@@ -772,7 +710,7 @@ if ((($AdminPWExists -eq "Failed") -or ($AdminPWChange -eq "Failed") -or ($Admin
 		{
 			Start-UserPrompt -BodyText "No admin password is set, but the script was unable to set a password. Please reboot the computer and manually set the admin password." -TitleText "Dell Password Management Script"
 		}
-		if ($AdminPWChange -eq "Failed")
+		if ($AdminPWSet -eq "Failed")
 		{
 			Start-UserPrompt -BodyText "The admin password is set, but cannot be automatically changed. Please reboot the computer and manually change the admin password." -TitleText "Dell Password Management Script"
 		}
@@ -784,7 +722,7 @@ if ((($AdminPWExists -eq "Failed") -or ($AdminPWChange -eq "Failed") -or ($Admin
 		{
 			Start-UserPrompt -BodyText "No system password is set, but the script was unable to set a password. Please reboot the computer and manually set the system password." -TitleText "Dell Password Management Script"
 		}
-		if ($SystemPWChange -eq "Failed")
+		if ($SystemPWSet -eq "Failed")
 		{
 			Start-UserPrompt -BodyText "The system password is set, but cannot be automatically changed. Please reboot the computer and manually change the system password." -TitleText "Dell Password Management Script"
 		}
@@ -811,7 +749,7 @@ if ((($AdminPWExists -eq "Failed") -or ($AdminPWChange -eq "Failed") -or ($Admin
 		Write-Output "Failures detected, but the ContinueOnError parameter was set. Script execution will continue"
 	}
 }
-elseif ((($AdminPWExists -eq "Failed") -or ($AdminPWChange -eq "Failed") -or ($AdminPWClear -eq "Failed") -or ($SystemPWExists -eq "Failed") -or ($SystemPWChange -eq "Failed") -or ($SystemPWClear -eq "Failed") -or ($SystemAlreadySet -eq "Failed")) -and ($SMSTSPasswordRetry))
+elseif ((($AdminPWExists -eq "Failed") -or ($AdminPWSet -eq "Failed") -or ($AdminPWClear -eq "Failed") -or ($SystemPWExists -eq "Failed") -or ($SystemPWSet -eq "Failed") -or ($SystemPWClear -eq "Failed") -or ($SystemAlreadySet -eq "Failed")) -and ($SMSTSPasswordRetry))
 {
 	Write-LogEntry -Value "Failures detected, but the SMSTSPasswordRetry parameter was set. No user prompts will be displayed" -Severity 3
 	Write-Output "Failures detected, but the SMSTSPasswordRetry parameter was set. No user prompts will be displayed"
