@@ -11,10 +11,11 @@
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
         Reference: https://www.configjon.com/lenovo-bios-settings-management/
-        Modified: 11/04/2019
+        Modified: 02/10/2020
 
     .CHANGELOG
         11/04/2019 - Added additional logging. Changed the default log path to $ENV:ProgramData\BiosScripts\Lenovo.
+        02/10/2020 - Fixed a bug where the script would ignore the supplied Supervisior Password when attempting to change settings.
 #>
 
 #Parameters ===================================================================================================================
@@ -335,8 +336,8 @@ $SuccessSet = 0
 $FailSet = 0
 $NotFound = 0
 
-#Set Lenovo BIOS settings - password is set
-if ($PasswordCheck -eq 1)
+#Set Lenovo BIOS settings - supervisor password is set
+if (($PasswordCheck -eq 2) -or ($PasswordCheck -eq 3) -or($PasswordCheck -eq 6) -or($PasswordCheck -eq 7))
 {
     ForEach($Setting in $Settings){
         $Data = $Setting.Split(';')
@@ -344,7 +345,7 @@ if ($PasswordCheck -eq 1)
     }
 }
 
-#Set Lenovo BIOS settings - password is not set
+#Set Lenovo BIOS settings - supervisor password is not set
 else
 {
     ForEach($Setting in $Settings){
