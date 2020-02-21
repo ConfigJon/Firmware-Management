@@ -1,0 +1,4 @@
+Name,Value
+SecureBoot,Enabled
+SecureBootMode,DeployedMode
+UefiNwStack,Enabled

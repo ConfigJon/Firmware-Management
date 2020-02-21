@@ -1,0 +1,8 @@
+Name,Value
+Security Chip 2.0,Enabled
+Security Chip 1.2,Active
+SecurityChip,Active
+Physical Presence for Provisioning,Disabled
+PhysicalPresenceForTpmProvision,Disable
+Physical Presnce for Clear ,Disabled
+PhysicalPresenceForTpmClear,Disable

@@ -1,15 +1,6 @@
-﻿<#
+<#
     .DESCRIPTION
-        Automatically configure HP BIOS settings
-
-        SetBIOSSetting Return Codes
-        0 - Success
-        1 - Not Supported
-        2 - Unspecified Error
-        3 - Timeout
-        4 - Failed - (Check for typos in the setting value)
-        5 - Invalid Parameter
-        6 - Access Denied - (Check that the BIOS password is correct)
+        Automatically configure Dell BIOS settings
     
     .PARAMETER GetSettings
         Instruct the script to get a list of current BIOS settings
@@ -20,34 +11,26 @@
     .PARAMETER CsvPath
         The path to the CSV file to be imported or exported
 
-    .PARAMETER SetupPassword
+    .PARAMETER AdminPassword
         The current BIOS password
 
     .EXAMPLE
         #Set BIOS settings supplied in the script
-        Manage-HPBiosSettings.ps1 -SetSettings -SetupPassword ExamplePassword
+        Manage-DellBiosSettings.ps1 -SetSettings -AdminPassword ExamplePassword
 
         #Set BIOS settings supplied in a CSV file
-        Manage-HPBiosSettings.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -SetupPassword ExamplePassword
+        Manage-DellBiosSettings.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -AdminPassword ExamplePassword
 
         #Output a list of current BIOS settings to the screen
-        Manage-HPBiosSettings.ps1 -GetSettings
+        Manage-DellBiosSettings.ps1 -GetSettings
 
         #Output a list of current BIOS settings to a CSV file
-        Manage-HPBiosSettings.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
+        Manage-DellBiosSettings.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
 
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
-        Reference: https://www.configjon.com/hp-bios-settings-management/
+        Reference: https://www.configjon.com/dell-bios-settings-management/
         Modified: 2020-02-21
-
-    .CHANGELOG
-        2019-11-04 - Added additional logging. Changed the default log path to $ENV:ProgramData\BiosScripts\HP.
-        2020-02-21 - Added the ability to get a list of current BIOS settings on a system via the GetSettings parameter
-                     Added the ability to read settings from or write settings to a csv file with the CsvPath parameter
-                     Added the SetSettings parameter to indicate that the script should attempt to set settings
-                     Changed the $Settings array in the script to be comma seperated instead of semi-colon seperated
-                     Updated formatting
 #>
 
 #Parameters ===================================================================================================================
@@ -55,7 +38,7 @@
 param(
     [Parameter(Mandatory=$false)][Switch]$GetSettings,
     [Parameter(Mandatory=$false)][Switch]$SetSettings,    
-    [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$SetupPassword,
+    [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$AdminPassword,
     [ValidateScript({
         if($_ -notmatch "(\.csv)")
         {
@@ -69,22 +52,21 @@ param(
 #List of settings to be configured ============================================================================================
 #==============================================================================================================================
 $Settings = (
-    "Deep S3,Off",
-    "Deep Sleep,Off",
-    "S4/S5 Max Power Savings,Disable",
-    "S5 Maximum Power Savings,Disable",
-    "Fingerprint Device,Disable",
-    "Num Lock State at Power-On,Off",
-    "NumLock on at boot,Disable",
-    "Numlock state at boot,Off",
-    "Prompt for Admin password on F9 (Boot Menu),Enable",
-    "Prompt for Admin password on F11 (System Recovery),Enable",
-    "Prompt for Admin password on F12 (Network Boot),Enable",
-    "PXE Internal IPV4 NIC boot,Enable",
-    "PXE Internal IPV6 NIC boot,Enable",
-    "PXE Internal NIC boot,Enable",
-    "Wake On LAN,Boot to Hard Drive",
-    "Swap Fn and Ctrl (Keys),Disable"
+    "FingerprintReader,Enabled",
+    "FnLock,Enabled",
+    "IntegratedAudio,Enabled",
+    "NumLock,Enabled",
+    "SecureBoot,Enabled",
+    "TpmActivation,Enabled",
+    "TpmClear,Disabled",
+    "TpmPpiClearOverride,Disabled",
+    "TpmPpiDpo,Disabled",
+    "TpmPpiPo,Enabled",
+    "TpmSecurity,Enabled",
+    "UefiNwStack,Enabled",
+    "Virtualization,Enabled",
+    "VtForDirectIo,Enabled",
+    "WakeOnLan,Disabled"
 )
 #==============================================================================================================================
 #==============================================================================================================================
@@ -100,7 +82,7 @@ Function Get-TaskSequenceStatus
 	}
 	catch{}
 
-    if($NULL -eq $TSEnv)
+	if($NULL -eq $TSEnv)
 	{
 		return $False
 	}
@@ -123,8 +105,8 @@ Function Get-TaskSequenceStatus
 	}
 }
 
-#Set a specific HP BIOS setting
-Function Set-HPBiosSetting
+#Set a specific Dell BIOS setting
+Function Set-DellBiosSetting
 {
     param(
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Name,
@@ -133,28 +115,11 @@ Function Set-HPBiosSetting
     )
 
     #Ensure the specified setting exists and get the possible values
-    $CurrentSetting = $SettingList | Where-Object Name -eq $Name | Select-Object -ExpandProperty Value
-    if($NULL -ne $CurrentSetting)
+    $CurrentValue = $SettingList | Where-Object Attribute -eq $Name | Select-Object -ExpandProperty CurrentValue
+    if($NULL -ne $CurrentValue)
     {
-        #Split the current values
-        $CurrentSettingSplit = $CurrentSetting.Split(',')
-
-        #Find the currently set value
-        $Count = 0
-        while($Count -lt $CurrentSettingSplit.Count)
-        {
-            if($CurrentSettingSplit[$Count].StartsWith('*'))
-            {
-                $CurrentValue = $CurrentSettingSplit[$Count]
-                break
-            }
-            else
-            {
-                $Count++
-            }
-        }
         #Setting is already set to specified value
-        if($CurrentValue.Substring(1) -eq $Value)
+        if($CurrentValue -eq $Value)
         {
             Write-LogEntry -Value "Setting ""$Name"" is already set to ""$Value""" -Severity 1
             $Script:AlreadySet++
@@ -162,25 +127,40 @@ Function Set-HPBiosSetting
         #Setting is not set to specified value
         else
         {
-            if(!([String]::IsNullOrEmpty($Password)))
+            $SettingPath = $SettingList | Where-Object Attribute -eq $Name | Select-Object -ExpandProperty PSChildName
+
+            if([String]::IsNullOrEmpty($Password))
             {
-                $SettingResult = ($Interface.SetBIOSSetting($Name,$Value,"<utf-16/>" + $Password)).Return
+                try
+                {
+                    Set-Item -Path DellSmbios:\$SettingPath\$Name -Value $Value
+                }
+                catch
+                {
+                    $SettingSet = "Failed"
+                }
             }
             else
             {
-                $SettingResult = ($Interface.SetBIOSSetting($Name,$Value)).Return
+                try
+                {
+                    Set-Item -Path DellSmbios:\$SettingPath\$Name -Value $Value -Password $Password
+                }
+                catch
+                {
+                    $SettingSet = "Failed"
+                }
             }
             
-
-            if($SettingResult -eq 0)
+            if($SettingSet -eq "Failed")
+            {
+                Write-LogEntry -Value "Failed to set ""$Name"" to ""$Value""." -Severity 3
+                $Script:FailSet++   
+            }
+            else
             {
                 Write-LogEntry -Value "Successfully set ""$Name"" to ""$Value""" -Severity 1
                 $Script:SuccessSet++
-            }
-            else
-            {
-                Write-LogEntry -Value "Failed to set ""$Name"" to ""$Value"". Return code $SettingResult" -Severity 3
-                $Script:FailSet++
             }
         }
     }
@@ -205,7 +185,7 @@ Function Write-LogEntry
 		[string]$Severity,
 		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
 		[ValidateNotNullOrEmpty()]
-		[string]$FileName = "Manage-HPBiosSettings.log"
+		[string]$FileName = "Manage-DellBiosSettings.log"
 	)
     # Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
@@ -232,7 +212,7 @@ Function Write-LogEntry
     $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
 		
     # Construct final log entry
-    $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-HPBiosSettings"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
+    $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-DellBiosSettings"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
 		
     # Add value to log file
     try
@@ -255,64 +235,83 @@ if(Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:ProgramData\BiosScripts\HP"
+	$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell"
 	if(!(Test-Path -PathType Container $LogsDirectory))
 	{
 		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
 	}
 }
-Write-Output "Log path set to $LogsDirectory\Manage-HPBiosSettings.log"
-Write-LogEntry -Value "START - HP BIOS settings management script" -Severity 1
+Write-Output "Log path set to $LogsDirectory\Manage-DellBiosSettings.log"
+Write-LogEntry -Value "START - Dell BIOS settings management script" -Severity 1
 
-#Connect to the HP_BIOSEnumeration WMI class
-$Error.Clear()
+#Check if 32 or 64 bit architecture
+if([System.Environment]::Is64BitOperatingSystem)
+{
+    $ModuleInstallPath = $env:ProgramFiles
+}
+else
+{
+    $ModuleInstallPath = ${env:ProgramFiles(x86)}    
+}
+
+#Verify the DellBIOSProvider module is installed
+Write-LogEntry -Value "Checking the version of the currently installed DellBIOSProvider module" -Severity 1
 try
 {
-    Write-LogEntry -Value "Connect to the HP_BIOSEnumeration WMI class" -Severity 1
-    $SettingList = Get-WmiObject -Namespace root\HP\InstrumentedBIOS -Class HP_BIOSEnumeration
+    $LocalVersion = Get-Package DellBIOSProvider -ErrorAction Stop | Select-Object -ExpandProperty Version
 }
 catch
 {
-    Write-LogEntry -Value "Unable to connect to the HP_BIOSEnumeration WMI class" -Severity 3
-    throw "Unable to connect to the HP_BIOSEnumeration WMI class"
+    $Local = $true
+    if(Test-Path "$ModuleInstallPath\WindowsPowerShell\Modules\DellBIOSProvider")
+    {
+        $LocalVersion = Get-Content "$ModuleInstallPath\WindowsPowerShell\Modules\DellBIOSProvider\DellBIOSProvider.psd1" | Select-String "ModuleVersion ="
+        $LocalVersion = (([regex]".*'(.*)'").Matches($LocalVersion))[0].Groups[1].Value
+        if($NULL -ne $LocalVersion)
+        {
+            Write-LogEntry -Value "The version of the currently installed DellBIOSProvider module is $LocalVersion" -Severity 1
+        }
+        else
+        {
+            Write-LogEntry -Value "DellBIOSProvider module not found on the local machine" -Severity 3
+            throw "DellBIOSProvider module not found on the local machine"
+        }
+    }
+    else
+    {
+        Write-LogEntry -Value "DellBIOSProvider module not found on the local machine" -Severity 3
+        throw "DellBIOSProvider module not found on the local machine"
+    }
 }
-if(!($Error))
+if(($NULL -ne $LocalVersion) -and (!($Local)))
 {
-	Write-LogEntry -Value "Successfully connected to the HP_BIOSEnumeration WMI class" -Severity 1
+    Write-LogEntry -Value "The version of the currently installed DellBIOSProvider module is $LocalVersion" -Severity 1
 }
 
-#Connect to the HP_BIOSSettingInterface WMI class
-$Error.Clear()
-try
+#Verify the DellBIOSProvider module is imported
+Write-LogEntry -Value "Verify the DellBIOSProvider module is imported" -Severity 1
+$ModuleCheck = Get-Module DellBIOSProvider
+if($ModuleCheck)
 {
-    Write-LogEntry -Value "Connect to the HP_BIOSSettingInterface WMI class" -Severity 1
-    $Interface = Get-WmiObject -Namespace root\HP\InstrumentedBIOS -Class HP_BIOSSettingInterface
+    Write-LogEntry -Value "The DellBIOSProvider module is already imported" -Severity 1
 }
-catch
+else
 {
-    Write-LogEntry -Value "Unable to connect to the HP_BIOSSettingInterface WMI class" -Severity 3
-    throw "Unable to connect to the HP_BIOSSettingInterface WMI class"
-}
-if(!($Error))
-{
-	Write-LogEntry -Value "Successfully connected to the HP_BIOSSettingInterface WMI class" -Severity 1
-}
-
-#Connect to the HP_BIOSSetting WMI class
-$Error.Clear()
-try
-{
-    Write-LogEntry -Value "Connect to the HP_BIOSSetting WMI class" -Severity 1
-    $HPBiosSetting = Get-WmiObject -Namespace root\HP\InstrumentedBIOS -Class HP_BIOSSetting
-}
-catch
-{
-    Write-LogEntry -Value "Unable to connect to the HP_BIOSSetting WMI class" -Severity 3
-    throw "Unable to connect to the HP_BIOSSetting WMI class"
-}
-if(!($Error))
-{
-	Write-LogEntry -Value "Successfully connected to the HP_BIOSSetting WMI class" -Severity 1
+    Write-LogEntry -Value "Importing the DellBIOSProvider module" -Severity 1
+    $Error.Clear()
+    try
+    {
+        Import-Module DellBIOSProvider -Force -ErrorAction Stop
+    }
+    catch 
+    {
+        Write-LogEntry -Value "Failed to import the DellBIOSProvider module" -Severity 3
+        throw "Failed to import the DellBIOSProvider module"
+    }
+    if(!($Error))
+    {
+        Write-LogEntry -Value "Successfully imported the DellBIOSProvider module" -Severity 1
+    }
 }
 
 #Parameter validation
@@ -351,63 +350,70 @@ if($SetSettings)
 #Get the current password status
 if($SetSettings)
 {
-    Write-LogEntry -Value "Check current BIOS setup password status" -Severity 1
-    $PasswordCheck = ($HPBiosSetting | Where-Object Name -eq "Setup Password").IsSet
+    Write-LogEntry -Value "Get the current password state" -Severity 1
+    $AdminPasswordCheck = Get-Item -Path DellSmbios:\Security\IsAdminPasswordSet | Select-Object -ExpandProperty CurrentValue
 
-    if($PasswordCheck -eq 1)
+    if($AdminPasswordCheck -eq "True")
     {
+        Write-LogEntry -Value "The Admin password is currently set" -Severity 1
+
         #Setup password set but parameter not specified
-        if([String]::IsNullOrEmpty($SetupPassword))
+        if([String]::IsNullOrEmpty($AdminPassword))
         {
-            Write-LogEntry -Value "The BIOS setup password is set, but no password was supplied. Use the SetupPassword parameter when a password is set" -Severity 3
-            throw "The BIOS setup password is set, but no password was supplied. Use the SetupPassword parameter when a password is set"
+            Write-LogEntry -Value "The Admin password is set, but no password was supplied. Use the AdminPassword parameter when a password is set" -Severity 3
+            throw "The Admin password is set, but no password was supplied. Use the AdminPassword parameter when a password is set"
         }
         #Setup password set correctly
-        if(($Interface.SetBIOSSetting("Setup Password","<utf-16/>" + $SetupPassword,"<utf-16/>" + $SetupPassword)).Return -eq 0)
-	    {
-		    Write-LogEntry -Value "The specified setup password matches the currently set password" -Severity 1
-        }
-        #Setup password not set correctly
-        else
+        try
         {
-            Write-LogEntry -Value "The specified setup password does not match the currently set password" -Severity 3
-            throw "The specified setup password does not match the currently set password"
+            Set-Item -Path DellSmbios:\Security\AdminPassword $AdminPassword -Password $AdminPassword -ErrorAction Stop
+        }
+        catch
+        {
+            $AdminPasswordCheck = "Failed"
+            Write-LogEntry -Value "The specified Admin password does not match the currently set password" -Severity 3
+            throw "The specified Admin password does not match the currently set password"
+        }
+        if(!($AdminPasswordCheck))
+        {
+            Write-LogEntry -Value "The specified Admin password matches the currently set password" -Severity 1
         }
     }
     else
     {
-        Write-LogEntry -Value "The BIOS setup password is not currently set" -Severity 1
+        Write-LogEntry -Value "The Admin password is not currently set" -Severity 1
+    }
+}
+
+#Get a list of current BIOS settings
+Write-LogEntry -Value "Getting a list of current BIOS settings" -Severity 1
+$DellSmbios = Get-ChildItem -Path DellSmbios:\
+$SettingCategory = $DellSmbios.Category
+$SettingList = @()
+$WarnPref = $WarningPreference #Get the current value of WarningPreference
+$WarningPreference = 'SilentlyContinue' #Suppress warnings
+
+if($SetSettings)
+{
+    foreach($Category in $SettingCategory){
+        $SettingList += Get-ChildItem -Path "DellSmbios:\$($Category)" | Select-Object Attribute,CurrentValue,PSChildName
     }
 }
 
 #Get the current settings
 if($GetSettings)
 {
-    $SettingList = $SettingList | Select-Object Name,Value | Sort-Object Name
+    foreach($Category in $SettingCategory){
+        $SettingList += Get-ChildItem -Path "DellSmbios:\$($Category)" | Select-Object Attribute,CurrentValue
+    }
+    $WarningPreference = $WarnPref #Revert WarningPreference back to the original value
+    $SettingList = $SettingList | Sort-Object Attribute
     $SettingObject = ForEach($Setting in $SettingList){
-        #Split the current values
-        $SettingSplit = ($Setting.Value).Split(',')
-
-        #Find the currently set value
-        $SplitCount = 0
-        while($SplitCount -lt $SettingSplit.Count)
-        {
-            if($SettingSplit[$SplitCount].StartsWith('*'))
-            {
-                $SetValue = ($SettingSplit[$SplitCount]).Substring(1)
-                break
-            }
-            else
-            {
-                $SplitCount++
-            }
-        }
         [PSCustomObject]@{
-            Name = $Setting.Name
-            Value = $SetValue
+            Name = $Setting.Attribute
+            Value = $Setting.CurrentValue
         }
     }
-
     if($CsvPath)
     {
         $SettingObject | Export-Csv -Path $CsvPath -NoTypeInformation
@@ -415,7 +421,7 @@ if($GetSettings)
     }
     else
     {
-        Write-Output $SettingObject    
+        Write-Output $SettingObject   
     }
 }
 
@@ -427,38 +433,38 @@ if($SetSettings)
         $Settings = Import-Csv -Path $CsvPath
     }
 
-    #Set HP BIOS settings - password is set
-    if($PasswordCheck -eq 1)
+    #Set Dell BIOS settings - password is set
+    if($AdminPasswordCheck -eq "True")
     {
         if($CsvPath)
         {
             ForEach($Setting in $Settings){
-                Set-HPBiosSetting -Name $Setting.Name -Value $Setting.Value -Password $SetupPassword
+                Set-DellBiosSetting -Name $Setting.Name -Value $Setting.Value -Password $AdminPassword
             }
         }
         else
         {
             ForEach($Setting in $Settings){
                 $Data = $Setting.Split(',')
-                Set-HPBiosSetting -Name $Data[0].Trim() -Value $Data[1].Trim() -Password $SetupPassword   
+                Set-DellBiosSetting -Name $Data[0].Trim() -Value $Data[1].Trim() -Password $AdminPassword
             }
         }
     }
-    #Set HP BIOS settings - password is not set
+    #Set Dell BIOS settings - password is not set
     else
     {
         if($CsvPath)
         {
             ForEach($Setting in $Settings){
-                Set-HPBiosSetting -Name $Setting.Name -Value $Setting.Value
-            }
+                Set-DellBiosSetting -Name $Setting.Name -Value $Setting.Value
+            }   
         }
         else
         {
             ForEach($Setting in $Settings){
                 $Data = $Setting.Split(',')
-                Set-HPBiosSetting -Name $Data[0].Trim() -Value $Data[1].Trim()            
-            }
+                Set-DellBiosSetting -Name $Data[0].Trim() -Value $Data[1].Trim()
+            }   
         }
     }
 }
@@ -475,5 +481,5 @@ if($SetSettings)
     Write-Output "$NotFound settings not found"
     Write-LogEntry -Value "$NotFound settings not found" -Severity 2
 }
-Write-Output "HP BIOS settings Management completed. Check the log file for more information"
-Write-LogEntry -Value "END - HP BIOS settings management script" -Severity 1
+Write-Output "Dell BIOS settings Management completed. Check the log file for more information"
+Write-LogEntry -Value "END - Dell BIOS settings management script" -Severity 1

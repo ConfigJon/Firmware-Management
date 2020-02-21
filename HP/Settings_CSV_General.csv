@@ -1,0 +1,61 @@
+Name,Value
+After Power Loss,Off
+Deep S3,Off
+Deep Sleep,Off
+Power state after power loss,Power Off
+S4/S5 Max Power Savings,Disable
+S5 Maximum Power Savings,Disable
+Wake unit from sleep when lid is opened,Enable
+Wake unit from sleep when lid is opened,Enabled
+Wake when Lid is Opened,Enable
+Audio Alerts During Boot,Enable
+Audio Device,Enable
+Fingerprint Device,Disable
+Integrated Audio,Enable
+Integrated Camera,Enable
+Integrated Microphone,Enable
+Internal speaker,Enable
+Internal speakers,Enable
+Microphone,Enable
+Num Lock State at Power-On,Off
+NumLock on at boot,Off
+NumLock on at boot,Disable
+Numlock state at boot,Off
+System Audio,Device available
+Intel VT for Directed I/O (VT-d),Enable
+Intel(R) VT-d,Enable
+Virtualization Technology,Enable
+Virtualization Technology (VTx),Enable
+Virtualization Technology (VT-x),Enable
+Virtualization Technology (VTx/VTd),Enable
+Virtualization Technology Directed I/O (VTd),Enable
+Virtualization Technology Directed I/O (VT-d2),Enable
+Virtualization Technology for Directed I/O,Enable
+Virtualization Technology for Directed I/O (VTd),Enable
+Password prompt on F9 & F12,Enable
+Password prompt on F9 F11 & F12,Enable
+Prompt for Admin password on F9 (Boot Menu),Enable
+Prompt for Admin password on F11 (System Recovery),Enable
+Prompt for Admin password on F12 (Network Boot),Enable
+Network (PXE) Boot,Enable
+Network (PXE) Boot Configuration,IPv4 Before IPv6
+Network Boot,Enable
+Network Service Boot,Enable
+PXE Internal IPV4 NIC boot,Enable
+PXE Internal IPV6 NIC boot,Enable
+PXE Internal NIC boot,Enable
+Remote Wakeup Boot Source,Local Hard Drive
+S4/S5 Wake on LAN,Enable
+S5 Wake on LAN,Enable
+S5 Wake On LAN,Boot to Hard Drive
+Wake on LAN,Follow Boot Order
+Wake On LAN,Boot to Hard Drive
+Wake on LAN on DC mode,Enable
+Wake on LAN on DC mode,Enabled
+Wake on WLAN,Enable
+Fast Boot,Enable
+LAN / WLAN Auto Switching,Enabled
+LAN / WLAN Auto Switching,Enable
+LAN/WLAN Switching,Enable
+Swap Fn and Ctrl (Keys),Disable
+Swap Fn and Ctrl (Keys),Disabled

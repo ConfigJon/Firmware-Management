@@ -1,0 +1,7 @@
+Name,Value
+TpmActivation,Enabled
+TpmClear,Disabled
+TpmPpiClearOverride,Enabled
+TpmPpiDpo,Enabled
+TpmPpiPo,Enabled
+TpmSecurity,Enabled

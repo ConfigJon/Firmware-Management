@@ -1,0 +1,17 @@
+Name,Value
+PXE IPV4 Network Stack,Enabled
+IPv4NetworkStack,Enable
+PXE IPV6 Network Stack,Enabled
+IPv6NetworkStack,Enable
+Intel(R) Virtualization Technology,Enabled
+VirtualizationTechnology,Enable
+VT-d,Enabled
+VTdFeature,Enable
+Enhanced Power Saving Mode,Disabled
+Wake on LAN,Primary
+Require Admin. Pass. For F12 Boot,Yes
+Physical Presence for Provisioning,Disabled
+PhysicalPresenceForTpmProvision,Disable
+Physical Presnce for Clear ,Disabled
+PhysicalPresenceForTpmClear,Disable
+Boot Up Num-Lock Status,Off

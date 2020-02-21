@@ -1,0 +1,14 @@
+Name,Value
+Boot Mode,UEFI Native (Without CSM)
+Configure Option ROM Launch Policy,All UEFI
+Legacy Boot Options,Disable
+Legacy Support,Disable
+PXE Option ROMs,UEFI Only
+Storage Option ROMs,UEFI Only
+UEFI Boot Mode,Enable
+UEFI Boot Options,Enable
+Video Option ROMs,UEFI Only
+Configure Legacy Support and Secure Boot,Legacy Support Disable and Secure Boot Enable
+Configure Legacy Support and Secure Boot,Disable Legacy Support and Enable Secure Boot
+Secure Boot,Enable
+SecureBoot,Enable

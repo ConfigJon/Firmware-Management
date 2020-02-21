@@ -1,0 +1,19 @@
+Name,Value
+Embedded Security Device,Device available
+Embedded Security Device Availability,Available
+OS management of Embedded Security Device,Enable
+OS Management of TPM,Enable
+Reset of Embedded Security Device through OS,Enable
+Reset of TPM from OS,Enable
+TPM Device,Available
+TPM State,Enable
+Activate Embedded Security On Next Boot,Enable
+Activate TPM On Next Boot,Enable
+Embedded Security Activation Policy,No prompts
+TPM Activation Policy,No prompts
+Clear TPM,No
+TPM Clear,Do not Clear
+Physical Presence Interface,Disable
+Tpm No PPI maintenance,Enable
+Tpm No PPI provisioning,Enable
+Tpm PPI policy changed by OS allowed,Enable

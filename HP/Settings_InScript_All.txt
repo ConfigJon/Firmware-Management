@@ -64,4 +64,41 @@
 "LAN / WLAN Auto Switching;Enable", #Disable,Enable
 "LAN/WLAN Switching;Enable", #Disable,Enable
 "Swap Fn and Ctrl (Keys);Disable", #Disable,Enable
-"Swap Fn and Ctrl (Keys);Disabled" #Disabled,Enabled
+"Swap Fn and Ctrl (Keys);Disabled", #Disabled,Enabled
+#Enable TPM
+"Embedded Security Device;Device available", #Device hidden,Device available
+"Embedded Security Device Availability;Available", #Available,Hidden
+"OS management of Embedded Security Device;Enable", #Enable,Disable
+"OS Management of TPM;Enable", #Disable,Enable
+"Reset of Embedded Security Device through OS;Enable", #Disable,Enable
+"Reset of TPM from OS;Enable", #Disable,Enable
+"TPM Device;Available", #Hidden,Available
+"TPM State;Enable", #Disable,Enable
+#Activate TPM
+"Activate Embedded Security On Next Boot;Enable", #Disable,Enable
+"Activate TPM On Next Boot;Enable", #Disable,Enable
+"Embedded Security Activation Policy;No prompts", #F1 to Boot,Allow user to reject,No prompts
+"TPM Activation Policy;No prompts", #F1 to Boot,Allow user to reject,No prompts
+#Clear TPM
+"Clear TPM;No", #No,On next boot
+"TPM Clear;Do not Clear", #Do not Clear,Clear
+#Physical Presence Interface Settings
+"Physical Presence Interface;Disable", #Disable,Enable
+"Tpm No PPI maintenance;Enable", #Disable,Enable
+"Tpm No PPI provisioning;Enable", #Disable,Enable
+"Tpm PPI policy changed by OS allowed;Enable", #Disable,Enable
+#Enable UEFI Support
+"Boot Mode;UEFI Native (Without CSM)", #Legacy,UEFI Hybrid (With CSM),UEFI Native (Without CSM)
+"Configure Option ROM Launch Policy;All UEFI", #All Legacy,All UEFI,All UEFI Except Video
+"Legacy Boot Options;Disable", #Disable,Enable
+"Legacy Support;Disable", #Disable,Enable
+"PXE Option ROMs;UEFI Only", #Do Not Launch,UEFI Only,Legacy Only
+"Storage Option ROMs;UEFI Only", #Do Not Launch,UEFI Only,Legacy Only
+"UEFI Boot Mode;Enable", #Disable,Enable
+"UEFI Boot Options;Enable", #Disable,Enable
+"Video Option ROMs;UEFI Only", #Legacy Only,UEFI Only
+#Enable Secure Boot
+"Configure Legacy Support and Secure Boot;Legacy Support Disable and Secure Boot Enable", #Legacy Support Enable and Secure Boot Disable,Legacy Support Disable and Secure Boot Enable,Legacy Support Disable and Secure Boot Disable
+"Configure Legacy Support and Secure Boot;Disable Legacy Support and Enable Secure Boot", #Enable Legacy Support and Disable Secure Boot,Disable Legacy Support and Enable Secure Boot,Disable Legacy Support and Disable Secure Boot
+"Secure Boot;Enable", #Disable,Enable
+"SecureBoot;Enable" #Disable,Enable
