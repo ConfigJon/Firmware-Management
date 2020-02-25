@@ -1,7 +1,7 @@
 <#
     .DESCRIPTION
         Automatically configure Dell BIOS settings
-    
+
     .PARAMETER GetSettings
         Instruct the script to get a list of current BIOS settings
 
@@ -37,14 +37,14 @@
 
 param(
     [Parameter(Mandatory=$false)][Switch]$GetSettings,
-    [Parameter(Mandatory=$false)][Switch]$SetSettings,    
+    [Parameter(Mandatory=$false)][Switch]$SetSettings,
     [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$AdminPassword,
     [ValidateScript({
         if($_ -notmatch "(\.csv)")
         {
             throw "The specified file must be a .csv file"
         }
-        return $true 
+        return $true
     })]
     [System.IO.FileInfo]$CsvPath
 )
@@ -133,7 +133,7 @@ Function Set-DellBiosSetting
             {
                 try
                 {
-                    Set-Item -Path DellSmbios:\$SettingPath\$Name -Value $Value
+                    Set-Item -Path DellSmbios:\$SettingPath\$Name -Value $Value -ErrorAction Stop
                 }
                 catch
                 {
@@ -144,18 +144,18 @@ Function Set-DellBiosSetting
             {
                 try
                 {
-                    Set-Item -Path DellSmbios:\$SettingPath\$Name -Value $Value -Password $Password
+                    Set-Item -Path DellSmbios:\$SettingPath\$Name -Value $Value -Password $Password -ErrorAction Stop
                 }
                 catch
                 {
                     $SettingSet = "Failed"
                 }
             }
-            
+
             if($SettingSet -eq "Failed")
             {
                 Write-LogEntry -Value "Failed to set ""$Name"" to ""$Value""." -Severity 3
-                $Script:FailSet++   
+                $Script:FailSet++
             }
             else
             {
@@ -189,7 +189,7 @@ Function Write-LogEntry
 	)
     # Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-		
+
     # Construct time stamp for log entry
     if(-not(Test-Path -Path 'variable:global:TimezoneBias'))
     {
@@ -204,16 +204,16 @@ Function Write-LogEntry
         }
     }
     $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
-		
+
     # Construct date for log entry
     $Date = (Get-Date -Format "MM-dd-yyyy")
-		
+
     # Construct context for log entry
     $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
-		
+
     # Construct final log entry
     $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-DellBiosSettings"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
-		
+
     # Add value to log file
     try
     {
@@ -251,7 +251,7 @@ if([System.Environment]::Is64BitOperatingSystem)
 }
 else
 {
-    $ModuleInstallPath = ${env:ProgramFiles(x86)}    
+    $ModuleInstallPath = ${env:ProgramFiles(x86)}
 }
 
 #Verify the DellBIOSProvider module is installed
@@ -303,7 +303,7 @@ else
     {
         Import-Module DellBIOSProvider -Force -ErrorAction Stop
     }
-    catch 
+    catch
     {
         Write-LogEntry -Value "Failed to import the DellBIOSProvider module" -Severity 3
         throw "Failed to import the DellBIOSProvider module"
@@ -421,7 +421,7 @@ if($GetSettings)
     }
     else
     {
-        Write-Output $SettingObject   
+        Write-Output $SettingObject
     }
 }
 
@@ -457,14 +457,14 @@ if($SetSettings)
         {
             ForEach($Setting in $Settings){
                 Set-DellBiosSetting -Name $Setting.Name -Value $Setting.Value
-            }   
+            }
         }
         else
         {
             ForEach($Setting in $Settings){
                 $Data = $Setting.Split(',')
                 Set-DellBiosSetting -Name $Data[0].Trim() -Value $Data[1].Trim()
-            }   
+            }
         }
     }
 }
