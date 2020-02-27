@@ -1,7 +1,7 @@
 <#
     .DESCRIPTION
         Import the Dell Command | PowerShell Provider module
-    
+
     .PARAMETER ModulePath
         Specify the location of the DellBIOSProvider module source files. This parameter should be specified when the script is running in WinPE or when the system does not have internet access
 
@@ -9,7 +9,7 @@
         Specify the location of the .dll files required to run the DellBIOSProvider module. This parameter should be specified when the script is running in WinPE or when the system does not have the required Visual C++ Redistributables installed
 
     .EXAMPLE
-        Running in a full Windows OS and installing from the internet    
+        Running in a full Windows OS and installing from the internet
             Install-DellBiosProvider.ps1
 
         Running in WinPE
@@ -33,7 +33,7 @@ param(
         {
             throw "The ModulePath argument must be a folder path"
         }
-        return $true 
+        return $true
     })]
     [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$ModulePath,
     [ValidateScript({
@@ -45,7 +45,7 @@ param(
         {
             throw "The DllPath argument must be a folder path"
         }
-        return $true 
+        return $true
     })]
     [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$DllPath
 )
@@ -88,7 +88,7 @@ Function Get-TaskSequenceStatus
 Function Uninstall-DellBIOSProvider
 {
     Write-LogEntry -Value "Uninstall previous versions of the DellBIOSProvider module" -Severity 1
-    $Module = Get-Package DellBIOSProvider -ErrorAction SilentlyContinue
+    $Module = Get-Module -ListAvailable -Name 'DellBIOSProvider' -ErrorAction SilentlyContinue
     $ModuleFile = Test-Path "$ModuleInstallPath\WindowsPowerShell\Modules\DellBIOSProvider"
 
     if (($NULL -eq $Module) -and !($ModuleFile))
@@ -101,7 +101,7 @@ Function Uninstall-DellBIOSProvider
         {
             while ($NULL -ne $Module)
             {
-                $Version = Get-Package DellBIOSProvider -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Version
+                $Version = Get-Module -ListAvailable -Name 'DellBIOSProvider' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Version
                 Write-LogEntry -Value "Uninstalling DellBIOSProvider module version $Version" -Severity 1
                 $Error.Clear()
                 try
@@ -117,14 +117,14 @@ Function Uninstall-DellBIOSProvider
                     Write-LogEntry -Value "Successfully uninstalled DellBIOSProvider module version $Version" -Severity 1
                 }
                 Clear-Variable Module,Version
-                $Module = Get-Package DellBIOSProvider -ErrorAction SilentlyContinue
+                $Module = Get-Module -ListAvailable -Name 'DellBIOSProvider' -ErrorAction SilentlyContinue
             }
         }
         else
         {
             Remove-Item "$ModuleInstallPath\WindowsPowerShell\Modules\DellBIOSProvider" -Recurse -Force
             Write-LogEntry -Value "Successfully uninstalled the existing DellBIOSProvider module" -Severity 1
-        }   
+        }
     }
 }
 
@@ -261,7 +261,7 @@ Function Copy-Dll
             {
                 throw "The specified file must be a .dll file"
             }
-            return $true 
+            return $true
         })]
         [Parameter(Mandatory=$true)][System.IO.FileInfo]$DllFile,
         [ValidateScript({
@@ -273,7 +273,7 @@ Function Copy-Dll
             {
                 throw "The DllTargetPath argument must be a folder path"
             }
-            return $true 
+            return $true
         })]
         [Parameter(Mandatory=$true)][System.IO.DirectoryInfo]$DllTargetPath,
         [ValidateScript({
@@ -285,7 +285,7 @@ Function Copy-Dll
             {
                 throw "The DllSourcePath argument must be a folder path"
             }
-            return $true 
+            return $true
         })]
         [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$DllSourcePath
     )
@@ -294,7 +294,7 @@ Function Copy-Dll
     {
         Write-LogEntry -Value "Could not find $DllTargetPath\$DllFile" -Severity 2
         Write-LogEntry -Value "Copying $DllFile to $DllTargetPath" -Severity 1
-        
+
         if ($DllSourcePath)
         {
             $Error.Clear()
@@ -332,7 +332,7 @@ Function Copy-Dll
     }
     else
     {
-        Write-LogEntry -Value "Found $DllFile" -Severity 1    
+        Write-LogEntry -Value "Found $DllFile" -Severity 1
     }
 }
 #Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
@@ -352,7 +352,7 @@ Function Write-LogEntry
 	)
     # Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-		
+
     # Construct time stamp for log entry
     if (-not(Test-Path -Path 'variable:global:TimezoneBias'))
     {
@@ -367,16 +367,16 @@ Function Write-LogEntry
         }
     }
     $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
-		
+
     # Construct date for log entry
     $Date = (Get-Date -Format "MM-dd-yyyy")
-		
+
     # Construct context for log entry
     $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
-		
+
     # Construct final log entry
     $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Install-DellBiosProvider"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
-		
+
     # Add value to log file
     try
     {
@@ -419,7 +419,7 @@ else
 {
     $ErrMsg = "The current PowerShell version is $PsVer. The mininum supported PowerShell version is 3"
     Write-LogEntry -Value $ErrMsg -Severity 3
-    throw $ErrMsg  
+    throw $ErrMsg
 }
 
 #Check the SMBIOS version
@@ -472,14 +472,14 @@ if ([System.Environment]::Is64BitOperatingSystem)
 }
 else
 {
-    $ModuleInstallPath = ${env:ProgramFiles(x86)}    
+    $ModuleInstallPath = ${env:ProgramFiles(x86)}
 }
 
 #Get the version of the currently installed DellBIOSProvider module
 Write-LogEntry -Value "Checking the version of the currently installed DellBIOSProvider module" -Severity 1
 try
 {
-    $LocalVersion = Get-Package DellBIOSProvider -ErrorAction Stop | Select-Object -ExpandProperty Version
+    $LocalVersion = Get-Module -ListAvailable -Name 'DellBIOSProvider' -ErrorAction Stop | Select-Object -ExpandProperty Version
 }
 catch
 {
@@ -613,7 +613,7 @@ else
     {
         Import-Module DellBIOSProvider -Force -ErrorAction Stop
     }
-    catch 
+    catch
     {
         Write-LogEntry -Value "Failed to import the DellBIOSProvider module" -Severity 3
         throw "Failed to import the DellBIOSProvider module"

@@ -25,7 +25,7 @@
 
 	.PARAMETER OldSystemPassword
 		Specify the old system password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
-	
+
 	.PARAMETER NoUserPrompt
 		The script will run silently and will not prompt the user with a message box.
 
@@ -38,7 +38,7 @@
 	.EXAMPLE
 		Set a new admin password
 		Manage-DellBiosPasswords.ps1 -AdminSet -AdminPassword <String>
-	
+
 		Set or change a admin password
 		Manage-DellBiosPasswords.ps1 -AdminSet -AdminPassword <String> -OldAdminPassword <String1>,<String2>,<String3>
 
@@ -116,7 +116,7 @@ Function Start-UserPrompt
         [Parameter(Mandatory=$True)][ValidateNotNullOrEmpty()][String[]]$BodyText,
         [Parameter(Mandatory=$True)][ValidateNotNullOrEmpty()][String[]]$TitleText
     )
-	
+
     if (!($NoUserPrompt))
 	{
 		(New-Object -ComObject Wscript.Shell).Popup("$BodyText",0,"$TitleText",0x0 + 0x30) | Out-Null
@@ -140,7 +140,7 @@ Function Write-LogEntry
 	)
 	# Determine log file location
 	$LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-		
+
 	# Construct time stamp for log entry
 	if (-not(Test-Path -Path 'variable:global:TimezoneBias'))
 	{
@@ -155,16 +155,16 @@ Function Write-LogEntry
 		}
 	}
 	$Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
-		
+
 	# Construct date for log entry
 	$Date = (Get-Date -Format "MM-dd-yyyy")
-		
+
 	# Construct context for log entry
 	$Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
-		
+
 	# Construct final log entry
 	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-DellBiosPasswords"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
-		
+
 	# Add value to log file
 	try
 	{
@@ -202,14 +202,14 @@ if ([System.Environment]::Is64BitOperatingSystem)
 }
 else
 {
-    $ModuleInstallPath = ${env:ProgramFiles(x86)}    
+    $ModuleInstallPath = ${env:ProgramFiles(x86)}
 }
 
 #Verify the DellBIOSProvider module is installed
 Write-LogEntry -Value "Checking the version of the currently installed DellBIOSProvider module" -Severity 1
 try
 {
-    $LocalVersion = Get-Package DellBIOSProvider -ErrorAction Stop | Select-Object -ExpandProperty Version
+	$LocalVersion = Get-Module -ListAvailable -Name 'DellBIOSProvider' -ErrorAction Stop | Select-Object -ExpandProperty Version
 }
 catch
 {
@@ -254,7 +254,7 @@ else
     {
         Import-Module DellBIOSProvider -Force -ErrorAction Stop
     }
-    catch 
+    catch
     {
         Write-LogEntry -Value "Failed to import the DellBIOSProvider module" -Severity 3
         throw "Failed to import the DellBIOSProvider module"
@@ -430,7 +430,7 @@ if ($AdminPasswordCheck -eq "False")
 			if (!($Error))
 			{
 				Write-LogEntry -Value "The admin password has been successfully set" -Severity 1
-			}	
+			}
 		}
 	}
 }
@@ -477,7 +477,7 @@ if ($SystemPasswordCheck -eq "False")
 			if (!($Error))
 			{
 				Write-LogEntry -Value "The system password has been successfully set" -Severity 1
-			}	
+			}
 		}
 	}
 }
@@ -494,7 +494,7 @@ if ($AdminPasswordCheck -eq "True")
 		{
 			$TSEnv.Value("DellSetAdmin") = "Failed"
 		}
-        
+
 		try
 		{
 			Set-Item -Path DellSmbios:\Security\AdminPassword $AdminPassword -Password $AdminPassword -ErrorAction Stop
@@ -542,7 +542,7 @@ if ($AdminPasswordCheck -eq "True")
 			Write-LogEntry -Value "The admin password is already set correctly" -Severity 1
 		}
 	}
-	
+
 	#Clear the existing admin password
 	if (($AdminClear) -and ($DellClearAdmin -ne "Success"))
 	{
@@ -552,7 +552,7 @@ if ($AdminPasswordCheck -eq "True")
 		{
 			$TSEnv.Value("DellClearAdmin") = "Failed"
 		}
-		
+
 		$Counter = 0
 		While($Counter -lt $OldAdminPassword.Count){
 			$Error.Clear()
@@ -576,12 +576,12 @@ if ($AdminPasswordCheck -eq "True")
 				if ($SystemPasswordCheck -eq "True")
 				{
 					Write-LogEntry -Value "The admin password and system password have been successfully cleared" -Severity 1
-					break	
+					break
 				}
 				else
 				{
 					Write-LogEntry -Value "The admin password has been successfully cleared" -Severity 1
-					break	
+					break
 				}
 			}
 			if ($AdminPWClear -eq "Failed")
@@ -604,7 +604,7 @@ if ($SystemPasswordCheck -eq "True")
 		{
 			$TSEnv.Value("DellSetSystem") = "Failed"
 		}
-        
+
 		try
 		{
 			Set-Item -Path DellSmbios:\Security\SystemPassword $SystemPassword -Password $SystemPassword -ErrorAction Stop
@@ -652,7 +652,7 @@ if ($SystemPasswordCheck -eq "True")
 			Write-LogEntry -Value "The system password is already set correctly" -Severity 1
 		}
 	}
-	
+
 	#Clear the existing system password
 	if (($SystemClear) -and ($DellClearSystem -ne "Success"))
 	{
