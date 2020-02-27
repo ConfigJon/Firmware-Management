@@ -18,6 +18,9 @@
         #Set BIOS settings supplied in the script
         Manage-DellBiosSettings.ps1 -SetSettings -AdminPassword ExamplePassword
 
+        #Set BIOS settings supplied in the script and script will exit with a failure if 1 or more settings have failed to be set correctly
+        Manage-DellBiosSettings.ps1 -SetSettings -AdminPassword ExamplePassword -ExitWithErrorOnFailure
+
         #Set BIOS settings supplied in a CSV file
         Manage-DellBiosSettings.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -AdminPassword ExamplePassword
 
@@ -46,7 +49,8 @@ param(
         }
         return $true
     })]
-    [System.IO.FileInfo]$CsvPath
+    [System.IO.FileInfo]$CsvPath,
+    [Parameter(Mandatory=$false)][Switch]$ExitWithErrorOnFailure
 )
 
 #List of settings to be configured ============================================================================================
@@ -258,7 +262,7 @@ else
 Write-LogEntry -Value "Checking the version of the currently installed DellBIOSProvider module" -Severity 1
 try
 {
-    $LocalVersion = Get-Package DellBIOSProvider -ErrorAction Stop | Select-Object -ExpandProperty Version
+    $LocalVersion = Get-Module -ListAvailable -Name 'DellBIOSProvider' -ErrorAction Stop | Select-Object -ExpandProperty Version
 }
 catch
 {
@@ -483,3 +487,6 @@ if($SetSettings)
 }
 Write-Output "Dell BIOS settings Management completed. Check the log file for more information"
 Write-LogEntry -Value "END - Dell BIOS settings management script" -Severity 1
+If($ExitWithErrorOnFailure -and $FailSet -gt 0){
+    Write-Error "$FailSet settings failed to set" -ErrorAction Stop
+}
