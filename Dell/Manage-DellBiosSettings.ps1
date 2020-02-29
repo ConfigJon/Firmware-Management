@@ -14,6 +14,13 @@
     .PARAMETER AdminPassword
         The current BIOS password
 
+    .PARAMETER LogsDirectory
+        The path of the directory where log files will be written to
+        If in a task sequence, LogsDirectory will automatically change to _SMSTSLogPath
+
+    .PARAMETER ExitWithErrorOnFailure
+        Instruct the script to exit with a failure if the script fails to set at least 1 setting
+
     .EXAMPLE
         #Set BIOS settings supplied in the script
         Manage-DellBiosSettings.ps1 -SetSettings -AdminPassword ExamplePassword
@@ -49,7 +56,8 @@ param(
         }
         return $true
     })]
-    [System.IO.FileInfo]$CsvPath,
+    [Parameter(Mandatory=$false)][System.IO.FileInfo]$CsvPath,
+    [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell",
     [Parameter(Mandatory=$false)][Switch]$ExitWithErrorOnFailure
 )
 
@@ -239,11 +247,10 @@ if(Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell"
-	if(!(Test-Path -PathType Container $LogsDirectory))
-	{
-		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
-	}
+    if(!(Test-Path -PathType Container $LogsDirectory))
+    {
+        New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
+    }
 }
 Write-Output "Log path set to $LogsDirectory\Manage-DellBiosSettings.log"
 Write-LogEntry -Value "START - Dell BIOS settings management script" -Severity 1

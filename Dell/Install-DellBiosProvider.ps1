@@ -8,6 +8,10 @@
     .PARAMETER DllPath
         Specify the location of the .dll files required to run the DellBIOSProvider module. This parameter should be specified when the script is running in WinPE or when the system does not have the required Visual C++ Redistributables installed
 
+    .PARAMETER LogsDirectory
+        The path of the directory where log files will be written to
+        If in a task sequence, LogsDirectory will automatically change to _SMSTSLogPath
+
     .EXAMPLE
         Running in a full Windows OS and installing from the internet
             Install-DellBiosProvider.ps1
@@ -47,7 +51,8 @@ param(
         }
         return $true
     })]
-    [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$DllPath
+    [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$DllPath,
+    [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell"
 )
 
 #Functions ====================================================================================================================
@@ -110,7 +115,17 @@ Function Uninstall-DellBIOSProvider
                 }
                 catch
                 {
-                    Write-LogEntry -Value "Failed to uninstall DellBIOSProvider module version $Version" -Severity 3
+                    try
+                    {
+                        Write-LogEntry -Value "Failed to uninstall DellBIOSProvider module version $Version with `'Uninstall-Module`' " -Severity 2
+                        $Error.Clear()
+                        Write-LogEntry -Value "Manually uninstalling DellBIOSProvider module version $Version" -Severity 1
+                        Remove-Item -Path $($Module.ModuleBase) -Recurse -Force -ErrorAction Stop
+                    }
+                    catch
+                    {
+                        Write-LogEntry -Value "Failed to manually uninstall DellBIOSProvider module version $Version" -Severity 3
+                    }
                 }
                 if (!($Error))
                 {
@@ -391,18 +406,17 @@ Function Write-LogEntry
 #Main program =================================================================================================================
 
 #Configure Logging and task sequence variables
-if (Get-TaskSequenceStatus)
+if(Get-TaskSequenceStatus)
 {
 	$TSEnv = New-Object -COMObject Microsoft.SMS.TSEnvironment
 	$LogsDirectory = $TSEnv.Value("_SMSTSLogPath")
 }
 else
 {
-	$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell"
-	if (!(Test-Path -PathType Container $LogsDirectory))
-	{
-		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
-	}
+    if(!(Test-Path -PathType Container $LogsDirectory))
+    {
+        New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
+    }
 }
 Write-Output "Log path set to $LogsDirectory\Install-DellBiosProvider.log"
 Write-LogEntry -Value "START - Dell BIOS provider installation script" -Severity 1

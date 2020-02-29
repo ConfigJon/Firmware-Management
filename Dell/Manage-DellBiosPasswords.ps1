@@ -35,6 +35,10 @@
 	.PARAMETER SMSTSPasswordRetry
 		For use in a task sequence. If specified, the script will assume the script needs to run at least one more time. This will ignore password errors and suppress user prompts.
 
+	.PARAMETER LogsDirectory
+        The path of the directory where log files will be written to
+        If in a task sequence, LogsDirectory will automatically change to _SMSTSLogPath
+
 	.EXAMPLE
 		Set a new admin password
 		Manage-DellBiosPasswords.ps1 -AdminSet -AdminPassword <String>
@@ -71,7 +75,8 @@ param(
 	[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$OldSystemPassword,
 	[Parameter(Mandatory=$false)][Switch]$NoUserPrompt,
 	[Parameter(Mandatory=$false)][Switch]$ContinueOnError,
-	[Parameter(Mandatory=$false)][Switch]$SMSTSPasswordRetry
+	[Parameter(Mandatory=$false)][Switch]$SMSTSPasswordRetry,
+	[Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell"
 )
 
 #Functions ====================================================================================================================
@@ -186,11 +191,10 @@ if (Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell"
-	if (!(Test-Path -PathType Container $LogsDirectory))
-	{
-		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
-	}
+    if (!(Test-Path -PathType Container $LogsDirectory))
+    {
+        New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
+    }
 }
 Write-Output "Log path set to $LogsDirectory\Manage-DellBiosPasswords.log"
 Write-LogEntry -Value "START - Dell BIOS password management script" -Severity 1
