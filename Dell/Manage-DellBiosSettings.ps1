@@ -18,6 +18,9 @@
         The path of the directory where log files will be written to
         If in a task sequence, LogsDirectory will automatically change to _SMSTSLogPath
 
+    .PARAMETER LogFilename
+        The name fo the log file
+
     .PARAMETER ExitWithErrorOnFailure
         Instruct the script to exit with a failure if the script fails to set at least 1 setting
 
@@ -57,7 +60,27 @@ param(
         return $true
     })]
     [Parameter(Mandatory=$false)][System.IO.FileInfo]$CsvPath,
+    [ValidateScript({
+        if (!($_ | Test-Path))
+        {
+            throw "The LogsDirectory folder path does not exist"
+        }
+        if (!($_ | Test-Path -PathType Container))
+        {
+            throw "The LogsDirectory argument must be a folder path"
+        }
+        return $true
+    })]
     [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell",
+    [ValidateScript({
+        if ($_ -notmatch "(\.log")
+        {
+            throw "The LogFilename must end with .log"
+        }
+        return $true
+    })]
+    [ValidateNotNullOrEmpty()]
+    [Parameter(Mandatory=$false)][System.IO.FileInfo]$LogFileName = "Manage-DellBiosSettings.log",
     [Parameter(Mandatory=$false)][Switch]$ExitWithErrorOnFailure
 )
 
@@ -197,7 +220,7 @@ Function Write-LogEntry
 		[string]$Severity,
 		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
 		[ValidateNotNullOrEmpty()]
-		[string]$FileName = "Manage-DellBiosSettings.log"
+		[string]$FileName = $LogFileName
 	)
     # Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
@@ -252,7 +275,7 @@ else
         New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
     }
 }
-Write-Output "Log path set to $LogsDirectory\Manage-DellBiosSettings.log"
+Write-Output "Log path set to $(Join-Path -Path $LogsDirectory -ChildPath $LogFileName)"
 Write-LogEntry -Value "START - Dell BIOS settings management script" -Severity 1
 
 #Check if 32 or 64 bit architecture

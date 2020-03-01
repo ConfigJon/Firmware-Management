@@ -12,6 +12,9 @@
         The path of the directory where log files will be written to
         If in a task sequence, LogsDirectory will automatically change to _SMSTSLogPath
 
+    .PARAMETER LogFilename
+        The name fo the log file
+
     .EXAMPLE
         Running in a full Windows OS and installing from the internet
             Install-DellBiosProvider.ps1
@@ -52,7 +55,27 @@ param(
         return $true
     })]
     [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$DllPath,
-    [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell"
+    [ValidateScript({
+        if (!($_ | Test-Path))
+        {
+            throw "The LogsDirectory folder path does not exist"
+        }
+        if (!($_ | Test-Path -PathType Container))
+        {
+            throw "The LogsDirectory argument must be a folder path"
+        }
+        return $true
+    })]
+    [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell",
+    [ValidateScript({
+        if ($_ -notmatch "(\.log")
+        {
+            throw "The LogFilename must end with .log"
+        }
+        return $true
+    })]
+    [ValidateNotNullOrEmpty()]
+    [Parameter(Mandatory=$false)][System.IO.FileInfo]$LogFileName = "Install-DellBiosProvider.log"
 )
 
 #Functions ====================================================================================================================
@@ -363,7 +386,7 @@ Function Write-LogEntry
 		[string]$Severity,
 		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
 		[ValidateNotNullOrEmpty()]
-		[string]$FileName = "Install-DellBiosProvider.log"
+		[string]$FileName = $LogFileName
 	)
     # Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
@@ -418,7 +441,7 @@ else
         New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
     }
 }
-Write-Output "Log path set to $LogsDirectory\Install-DellBiosProvider.log"
+Write-Output "Log path set to $(Join-Path -Path $LogsDirectory -ChildPath $LogFileName)"
 Write-LogEntry -Value "START - Dell BIOS provider installation script" -Severity 1
 
 #Check the PowerShell version
