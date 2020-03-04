@@ -73,7 +73,7 @@ param(
     })]
     [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell",
     [ValidateScript({
-        if ($_ -notmatch "(\.log")
+        if ($_ -notmatch "\.log")
         {
             throw "The LogFilename must end with .log"
         }
