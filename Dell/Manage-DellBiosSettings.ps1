@@ -21,7 +21,7 @@
     .PARAMETER LogFilename
         The name fo the log file
 
-    .PARAMETER ExitWithErrorOnFailure
+    .PARAMETER DoNotContinueOnError
         Instruct the script to exit with a failure if the script fails to set at least 1 setting
 
     .EXAMPLE
@@ -81,7 +81,7 @@ param(
     })]
     [ValidateNotNullOrEmpty()]
     [Parameter(Mandatory=$false)][System.IO.FileInfo]$LogFileName = "Manage-DellBiosSettings.log",
-    [Parameter(Mandatory=$false)][Switch]$ExitWithErrorOnFailure
+    [Parameter(Mandatory=$false)][Switch]$DoNotContinueOnError
 )
 
 #List of settings to be configured ============================================================================================
@@ -516,7 +516,12 @@ if($SetSettings)
     Write-LogEntry -Value "$NotFound settings not found" -Severity 2
 }
 Write-Output "Dell BIOS settings Management completed. Check the log file for more information"
-Write-LogEntry -Value "END - Dell BIOS settings management script" -Severity 1
-If($ExitWithErrorOnFailure -and $FailSet -gt 0){
-    Write-Error "$FailSet settings failed to set" -ErrorAction Stop
+If((-not $DoNotContinueOnError) -and $FailSet -gt 0)
+{
+    Write-LogEntry "$FailSet settings failed to set" -Severity 3
+    Write-LogEntry -Value "END - Dell BIOS settings management script" -Severity 1
+    Write-Error "Dell BIOS - $FailSet settings failed to set" -ErrorAction Stop
+}
+Else{
+    Write-LogEntry -Value "END - Dell BIOS settings management script" -Severity 1
 }
