@@ -266,19 +266,19 @@ Write-LogEntry -Value "Get the current password state and validate the specified
 $PasswordStatus = $PasswordSettings.PasswordState
 if ((($PasswordStatus -eq 0) -or ($PasswordStatus -eq 1) -or ($PasswordStatus -eq 4) -or ($PasswordStatus -eq 5)))
 {
-	Write-LogEntry -Value "The supervisor password is not currently set"
+	Write-LogEntry -Value "The supervisor password is not currently set" -Severity 1
 }
 else
 {
-	Write-LogEntry -Value "The supervisor password is currently set"
+	Write-LogEntry -Value "The supervisor password is currently set" -Severity 1
 }
 if ((($PasswordStatus -eq 0) -or ($PasswordStatus -eq 2) -or ($PasswordStatus -eq 4) -or ($PasswordStatus -eq 6)))
 {
-	Write-LogEntry -Value "The power on password is not currently set"
+	Write-LogEntry -Value "The power on password is not currently set" -Severity 1
 }
 else
 {
-	Write-LogEntry -Value "The power on password is currently set"
+	Write-LogEntry -Value "The power on password is currently set" -Severity 1
 }
 
 #Parameter validation
