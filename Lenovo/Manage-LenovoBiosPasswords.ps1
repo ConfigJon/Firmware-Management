@@ -84,6 +84,7 @@
 		01/30/2020 - Changed the SupervisorChange and PowerOnChange parameters to SupervisorSet and PowerOnSet. Changed the LenovoChangeSupervisor task sequence variable to LenovoSetSupervisor.
 					 Changed the LenovoChangePowerOn task sequence variable to LenovoSetPowerOn. Updated the parameter validation checks.
 		02/10/2020 - Added better logic for error handling when no Supervisor or Power On Passwords are set.
+		06/09/2020 - Updated some Write-LogEntry lines to include missing -Severity parameters
 #>
 
 #Parameters ===================================================================================================================
@@ -266,19 +267,19 @@ Write-LogEntry -Value "Get the current password state and validate the specified
 $PasswordStatus = $PasswordSettings.PasswordState
 if ((($PasswordStatus -eq 0) -or ($PasswordStatus -eq 1) -or ($PasswordStatus -eq 4) -or ($PasswordStatus -eq 5)))
 {
-	Write-LogEntry -Value "The supervisor password is not currently set"
+	Write-LogEntry -Value "The supervisor password is not currently set" -Severity 1
 }
 else
 {
-	Write-LogEntry -Value "The supervisor password is currently set"
+	Write-LogEntry -Value "The supervisor password is currently set" -Severity 1
 }
 if ((($PasswordStatus -eq 0) -or ($PasswordStatus -eq 2) -or ($PasswordStatus -eq 4) -or ($PasswordStatus -eq 6)))
 {
-	Write-LogEntry -Value "The power on password is not currently set"
+	Write-LogEntry -Value "The power on password is not currently set" -Severity 1
 }
 else
 {
-	Write-LogEntry -Value "The power on password is currently set"
+	Write-LogEntry -Value "The power on password is currently set" -Severity 1
 }
 
 #Parameter validation
