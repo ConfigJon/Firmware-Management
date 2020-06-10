@@ -20,6 +20,9 @@
 	.PARAMETER OldAdminPassword
 		Specify the old admin password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
 
+	.PARAMETER OldAdminPasswordsAsString
+		Specify the old admin password(s) to be changed. Multiple passwords can be specified as a comma seperated list in a single string. This is required when executing from command line.
+
 	.PARAMETER SystemPassword
 		Specify the new system password to set.
 
@@ -56,6 +59,7 @@
 	.CHANGELOG
 		01/30/2020 - Removed the AdminChange and SystemChange parameters. AdminSet and SystemSet now work to set or change a password. Changed the DellChangeAdmin task sequence variable to DellSetAdmin.
 					 Changed the DellChangeSystem task sequence variable to DellSetSystem. Updated the parameter validation checks.
+        10/06/2020 - Added possibility to pass old passwords in a single string (OldAdminPasswordsAsString) because in TS it's not possible to pass an Array value.
 #>
 
 #Parameters ===================================================================================================================
@@ -67,6 +71,7 @@ param(
 	[Parameter(Mandatory=$false)][Switch]$SystemClear,
 	[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$AdminPassword,
 	[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$OldAdminPassword,
+    [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$OldAdminPasswordsAsString,
 	[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$SystemPassword,
 	[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$OldSystemPassword,
 	[Parameter(Mandatory=$false)][Switch]$NoUserPrompt,
@@ -291,6 +296,12 @@ else
 #Parameter validation
 Write-LogEntry -Value "Begin parameter validation" -Severity 1
 
+if(-not [String]::IsNullOrWhiteSpace($OldAdminPasswordsAsString)){
+    $OldAdminPassword = $OldAdminPasswordsAsString.Split(",")
+    Write-LogEntry -Value "OldAdminPasswordsAsString split to OldAdminPassword" -Severity 1
+}
+
+
 if (($AdminSet) -and !($AdminPassword))
 {
 	$ErrorMsg = "When using the AdminSet switch, the AdminPassword parameter must also be specified"
@@ -494,7 +505,7 @@ if ($AdminPasswordCheck -eq "True")
 		{
 			$TSEnv.Value("DellSetAdmin") = "Failed"
 		}
-        
+        Write-LogEntry -Value "Passed $($OldAdminPassword.Count) old Passwords" -Severity 1
 		try
 		{
 			Set-Item -Path DellSmbios:\Security\AdminPassword $AdminPassword -Password $AdminPassword -ErrorAction Stop
