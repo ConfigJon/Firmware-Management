@@ -373,8 +373,16 @@ if($SetSettings)
 {
     Write-LogEntry -Value "Check current BIOS supervisor password status" -Severity 1
     $PasswordCheck = $PasswordSettings.PasswordState
-
     if(($PasswordCheck -eq 2) -or ($PasswordCheck -eq 3) -or($PasswordCheck -eq 6) -or($PasswordCheck -eq 7))
+    {
+        $SupervisorPasswordSet = $true
+    }
+    else
+    {
+        $SupervisorPasswordSet = $false
+    }
+    
+    if($SupervisorPasswordSet)
     {
         #Supervisor password set but parameter not specified
         if([String]::IsNullOrEmpty($SupervisorPassword))
@@ -440,7 +448,7 @@ if($SetSettings)
     }
 
     #Set Lenovo BIOS settings - supervisor password is set
-    if(($PasswordCheck -eq 2) -or ($PasswordCheck -eq 3) -or($PasswordCheck -eq 6) -or($PasswordCheck -eq 7))
+    if($SupervisorPasswordSet)
     {
         if($CsvPath)
         {
@@ -480,7 +488,26 @@ if($SetSettings)
 #If settings were set, save the changes
 if($SetSettings -and $SuccessSet -gt 0)
 {
-    $SaveSettings.SaveBiosSettings() | Out-Null
+    if($SupervisorPasswordSet)
+    {
+        $ReturnCode = $SaveSettings.SaveBiosSettings("$($SupervisorPassword),ascii,us") | Select-Object -ExpandProperty value
+    }
+    else
+    {
+        $ReturnCode = $SaveSettings.SaveBiosSettings() | Select-Object -ExpandProperty value
+    }
+    
+    if($ReturnCode -eq 'Success')
+    {
+        Write-Output -Value "Successfully saved BIOS settings."
+        Write-LogEntry -Value "Successfully saved BIOS settings." -Severity 1
+    }
+    else
+    {
+        Write-Output "Failed to save BIOS settings. Return Code = `"$($ReturnCode)`""
+        Write-LogEntry -Value "Failed to save BIOS settings. Return Code = `"$($ReturnCode)`"" -Severity 3
+        Exit 1
+    }
 }
 
 #Display results
