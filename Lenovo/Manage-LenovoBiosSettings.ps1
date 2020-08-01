@@ -497,7 +497,7 @@ if($SetSettings -and $SuccessSet -gt 0)
         $ReturnCode = $SaveSettings.SaveBiosSettings() | Select-Object -ExpandProperty value
     }
     
-    if($ReturnCode -eq 'Success')
+    if(($null -eq $ReturnCode) -or ($ReturnCode -eq 'Success'))
     {
         Write-Output -Value "Successfully saved BIOS settings."
         Write-LogEntry -Value "Successfully saved BIOS settings." -Severity 1
