@@ -32,7 +32,7 @@
 
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
-        Reference: https://www.configjon.com/dell-bios-settings-management-psmodule/
+        Reference: https://www.configjon.com/dell-bios-settings-management/
         Modified: 2020-09-07
 
     .CHANGELOG

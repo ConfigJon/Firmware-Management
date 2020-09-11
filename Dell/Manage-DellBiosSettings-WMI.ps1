@@ -59,7 +59,7 @@
 
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
-        Reference: https://www.configjon.com/dell-bios-settings-management-direct-wmi/
+        Reference: https://www.configjon.com/dell-bios-settings-management-wmi/
         Modified: 2020-09-11
         
 #>
