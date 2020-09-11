@@ -14,23 +14,31 @@
     .PARAMETER AdminPassword
         The current BIOS password
 
+    .PARAMETER LogFile
+        Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
+
     .EXAMPLE
         #Set BIOS settings supplied in the script
-        Manage-DellBiosSettings.ps1 -SetSettings -AdminPassword ExamplePassword
+        Manage-DellBiosSettings-PSModule.ps1 -SetSettings -AdminPassword ExamplePassword
 
         #Set BIOS settings supplied in a CSV file
-        Manage-DellBiosSettings.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -AdminPassword ExamplePassword
+        Manage-DellBiosSettings-PSModule.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -AdminPassword ExamplePassword
 
         #Output a list of current BIOS settings to the screen
-        Manage-DellBiosSettings.ps1 -GetSettings
+        Manage-DellBiosSettings-PSModule.ps1 -GetSettings
 
         #Output a list of current BIOS settings to a CSV file
-        Manage-DellBiosSettings.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
+        Manage-DellBiosSettings-PSModule.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
 
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
-        Reference: https://www.configjon.com/dell-bios-settings-management/
-        Modified: 2020-02-21
+        Reference: https://www.configjon.com/dell-bios-settings-management-psmodule/
+        Modified: 2020-09-07
+
+    .CHANGELOG
+        2020-09-07 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Dell. Changed the default log file name to Manage-DellBiosSettings-PSModule.log
+                     Created a new function (Stop-Script) to consolidate some duplicate code and improve error reporting. Made a number of minor formatting and syntax changes
+
 #>
 
 #Parameters ===================================================================================================================
@@ -46,7 +54,15 @@ param(
         }
         return $true 
     })]
-    [System.IO.FileInfo]$CsvPath
+    [System.IO.FileInfo]$CsvPath,
+    [Parameter(Mandatory=$false)][ValidateScript({
+        if($_ -notmatch "(\.log)")
+        {
+            throw "The file specified in the LogFile paramter must be a .log file"
+        }
+        return $true
+    })]
+    [System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\Dell\Manage-DellBiosSettings-PSModule.log"
 )
 
 #List of settings to be configured ============================================================================================
@@ -73,15 +89,14 @@ $Settings = (
 
 #Functions ====================================================================================================================
 
-#Determine if a task sequence is currently running
 Function Get-TaskSequenceStatus
 {
+    #Determine if a task sequence is currently running
 	try
 	{
 		$TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
 	}
 	catch{}
-
 	if($NULL -eq $TSEnv)
 	{
 		return $False
@@ -93,7 +108,6 @@ Function Get-TaskSequenceStatus
 			$SMSTSType = $TSEnv.Value("_SMSTSType")
 		}
 		catch{}
-
 		if($NULL -eq $SMSTSType)
 		{
 			return $False
@@ -105,15 +119,31 @@ Function Get-TaskSequenceStatus
 	}
 }
 
-#Set a specific Dell BIOS setting
+Function Stop-Script
+{
+    #Write an error to the log file and terminate the script
+
+    param(
+        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ErrorMessage,
+        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Exception
+    )
+    Write-LogEntry -Value $ErrorMessage -Severity 3
+    if($Exception)
+    {
+        Write-LogEntry -Value "Exception Message: $Exception" -Severity 3
+    }
+    throw $ErrorMessage
+}
+
 Function Set-DellBiosSetting
 {
+    #Set a specific Dell BIOS setting
+
     param(
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Name,
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Value,
         [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Password
     )
-
     #Ensure the specified setting exists and get the possible values
     $CurrentValue = $SettingList | Where-Object Attribute -eq $Name | Select-Object -ExpandProperty CurrentValue
     if($NULL -ne $CurrentValue)
@@ -128,7 +158,6 @@ Function Set-DellBiosSetting
         else
         {
             $SettingPath = $SettingList | Where-Object Attribute -eq $Name | Select-Object -ExpandProperty PSChildName
-
             if([String]::IsNullOrEmpty($Password))
             {
                 try
@@ -151,7 +180,6 @@ Function Set-DellBiosSetting
                     $SettingSet = "Failed"
                 }
             }
-            
             if($SettingSet -eq "Failed")
             {
                 Write-LogEntry -Value "Failed to set ""$Name"" to ""$Value""." -Severity 3
@@ -172,9 +200,10 @@ Function Set-DellBiosSetting
     }
 }
 
-#Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
 Function Write-LogEntry
 {
+    #Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
+
 	param(
 		[parameter(Mandatory = $true, HelpMessage = "Value added to the log file.")]
 		[ValidateNotNullOrEmpty()]
@@ -185,12 +214,11 @@ Function Write-LogEntry
 		[string]$Severity,
 		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
 		[ValidateNotNullOrEmpty()]
-		[string]$FileName = "Manage-DellBiosSettings.log"
+		[string]$FileName = ($script:LogFile | Split-Path -Leaf)
 	)
-    # Determine log file location
+    #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-		
-    # Construct time stamp for log entry
+    #Construct time stamp for log entry
     if(-not(Test-Path -Path 'variable:global:TimezoneBias'))
     {
         [string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
@@ -204,17 +232,13 @@ Function Write-LogEntry
         }
     }
     $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
-		
-    # Construct date for log entry
+    #Construct date for log entry
     $Date = (Get-Date -Format "MM-dd-yyyy")
-		
-    # Construct context for log entry
+    #Construct context for log entry
     $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
-		
-    # Construct final log entry
-    $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-DellBiosSettings"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
-		
-    # Add value to log file
+    #Construct final log entry
+    $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-DellBiosSettings-PSModule"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
+    #Add value to log file
     try
     {
         Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
@@ -235,13 +259,20 @@ if(Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:ProgramData\BiosScripts\Dell"
+	$LogsDirectory = ($LogFile | Split-Path)
 	if(!(Test-Path -PathType Container $LogsDirectory))
 	{
-		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
+		try
+		{
+			New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
+		}
+		catch
+		{
+			throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+		}
 	}
 }
-Write-Output "Log path set to $LogsDirectory\Manage-DellBiosSettings.log"
+Write-Output "Log path set to $LogFile"
 Write-LogEntry -Value "START - Dell BIOS settings management script" -Severity 1
 
 #Check if 32 or 64 bit architecture
@@ -273,14 +304,12 @@ catch
         }
         else
         {
-            Write-LogEntry -Value "DellBIOSProvider module not found on the local machine" -Severity 3
-            throw "DellBIOSProvider module not found on the local machine"
+            Stop-Script -ErrorMessage "DellBIOSProvider module not found on the local machine"
         }
     }
     else
     {
-        Write-LogEntry -Value "DellBIOSProvider module not found on the local machine" -Severity 3
-        throw "DellBIOSProvider module not found on the local machine"
+        Stop-Script -ErrorMessage "DellBIOSProvider module not found on the local machine"
     }
 }
 if(($NULL -ne $LocalVersion) -and (!($Local)))
@@ -305,8 +334,7 @@ else
     }
     catch 
     {
-        Write-LogEntry -Value "Failed to import the DellBIOSProvider module" -Severity 3
-        throw "Failed to import the DellBIOSProvider module"
+        Stop-Script -ErrorMessage "Failed to import the DellBIOSProvider module" -Exception $PSItem.Exception.Message
     }
     if(!($Error))
     {
@@ -316,26 +344,18 @@ else
 
 #Parameter validation
 Write-LogEntry -Value "Begin parameter validation" -Severity 1
-
 if($GetSettings -and $SetSettings)
 {
-	$ErrorMsg = "Cannot specify the GetSettings and SetSettings parameters at the same time"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
+    Stop-Script -ErrorMessage "Cannot specify the GetSettings and SetSettings parameters at the same time"
 }
 if(!($GetSettings -or $SetSettings))
 {
-	$ErrorMsg = "One of the GetSettings or SetSettings parameters must be specified when running this script"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
+    Stop-Script -ErrorMessage "One of the GetSettings or SetSettings parameters must be specified when running this script"
 }
 if($SetSettings -and !($Settings -or $CsvPath))
 {
-	$ErrorMsg = "Settings must be specified using either the Settings variable in the script or the CsvPath parameter"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
+    Stop-Script -ErrorMessage "Settings must be specified using either the Settings variable in the script or the CsvPath parameter"
 }
-
 Write-LogEntry -Value "Parameter validation completed" -Severity 1
 
 #Set counters to 0
@@ -352,16 +372,13 @@ if($SetSettings)
 {
     Write-LogEntry -Value "Get the current password state" -Severity 1
     $AdminPasswordCheck = Get-Item -Path DellSmbios:\Security\IsAdminPasswordSet | Select-Object -ExpandProperty CurrentValue
-
     if($AdminPasswordCheck -eq "True")
     {
         Write-LogEntry -Value "The Admin password is currently set" -Severity 1
-
         #Setup password set but parameter not specified
         if([String]::IsNullOrEmpty($AdminPassword))
         {
-            Write-LogEntry -Value "The Admin password is set, but no password was supplied. Use the AdminPassword parameter when a password is set" -Severity 3
-            throw "The Admin password is set, but no password was supplied. Use the AdminPassword parameter when a password is set"
+            Stop-Script -ErrorMessage "The Admin password is set, but no password was supplied. Use the AdminPassword parameter when a password is set"
         }
         #Setup password set correctly
         try
@@ -371,8 +388,7 @@ if($SetSettings)
         catch
         {
             $AdminPasswordCheck = "Failed"
-            Write-LogEntry -Value "The specified Admin password does not match the currently set password" -Severity 3
-            throw "The specified Admin password does not match the currently set password"
+            Stop-Script -ErrorMessage "The specified Admin password does not match the currently set password"
         }
         if(!($AdminPasswordCheck))
         {
@@ -424,7 +440,7 @@ if($GetSettings)
         Write-Output $SettingObject   
     }
 }
-
+#Set settings
 if($SetSettings)
 {
     if($CsvPath)
@@ -432,7 +448,6 @@ if($SetSettings)
         Clear-Variable Settings -ErrorAction SilentlyContinue
         $Settings = Import-Csv -Path $CsvPath
     }
-
     #Set Dell BIOS settings - password is set
     if($AdminPasswordCheck -eq "True")
     {
