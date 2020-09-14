@@ -5,6 +5,9 @@
     .PARAMETER ModulePath
         Specify the location of the HPCMSL modules source files. This parameter should be specified when the script is running in WinPE or when the system does not have internet access
 
+    .PARAMETER LogFile
+        Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
+
     .EXAMPLE
         Running in a full Windows OS and installing from the internet
             Install-HPCMSL.ps1
@@ -15,7 +18,11 @@
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
         Reference: https://www.configjon.com/installing-the-hp-client-management-script-library\
-        Modified: 03/09/2020
+        Modified: 2020-09-14
+
+    .CHANGELOG
+        2020-09-14 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\HP.
+                     Created a new function (Stop-Script) to consolidate some duplicate code and improve error reporting. Made a number of minor formatting and syntax changes
 #>
 
 #Parameters ===================================================================================================================
@@ -33,20 +40,27 @@ param(
         return $true 
     })]
     [Parameter(Mandatory=$false)][System.IO.DirectoryInfo]$ModulePath,
-    [Parameter(DontShow)][Switch]$Rerun
+    [Parameter(DontShow)][Switch]$Rerun,
+    [Parameter(Mandatory=$false)][ValidateScript({
+        if($_ -notmatch "(\.log)")
+        {
+            throw "The file specified in the LogFile paramter must be a .log file"
+        }
+        return $true
+    })]
+    [System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\HP\Install-HPCMSL.log"
 )
 
 #Functions ====================================================================================================================
 
-#Determine if a task sequence is currently running
 Function Get-TaskSequenceStatus
 {
+    #Determine if a task sequence is currently running
 	try
 	{
 		$TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
 	}
 	catch{}
-
 	if($NULL -eq $TSEnv)
 	{
 		return $False
@@ -58,7 +72,6 @@ Function Get-TaskSequenceStatus
 			$SMSTSType = $TSEnv.Value("_SMSTSType")
 		}
 		catch{}
-
 		if($NULL -eq $SMSTSType)
 		{
 			return $False
@@ -70,18 +83,33 @@ Function Get-TaskSequenceStatus
 	}
 }
 
-#Install the HPCMSL from local source files
+Function Stop-Script
+{
+    #Write an error to the log file and terminate the script
+
+    param(
+        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ErrorMessage,
+        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Exception
+    )
+    Write-LogEntry -Value $ErrorMessage -Severity 3
+    if($Exception)
+    {
+        Write-LogEntry -Value "Exception Message: $Exception" -Severity 3
+    }
+    throw $ErrorMessage
+}
+
 Function Install-HPCMSLLocal
 {
+    #Install the HPCMSL from local source files
+
     param(
         [parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][String]$InstallPath,
         [parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][String]$ModulePath,
         [parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][String]$ModuleName,
         [parameter(Mandatory = $false)][ValidateNotNullOrEmpty()][String]$Version
     )
-
     Write-LogEntry -Value "Install the $ModuleName module from $ModulePath" -Severity 1
-
     $Error.Clear()
     try
     {
@@ -104,15 +132,14 @@ Function Install-HPCMSLLocal
     }
 }
 
-#Install the HPCMSL from the PowerShell Gallery
 Function Install-HPCMSLRemote
 {
+    #Install the HPCMSL from the PowerShell Gallery
+
     param(
         [parameter(Mandatory = $false)][ValidateNotNullOrEmpty()][String]$Version
     )
-
     Write-LogEntry -Value "Install the HPCMSL module from the PowerShell Gallery" -Severity 1
-
     $Error.Clear()
     try
     {
@@ -120,8 +147,7 @@ Function Install-HPCMSLRemote
     }
     catch
     {
-        Write-LogEntry -Value "Unable to install the HPCMSL module from the PowerShell Gallery" -Severity 3
-        throw "Unable to install the HPCMSL module from the PowerShell Gallery"
+        Stop-Script -ErrorMessage "Unable to install the HPCMSL module from the PowerShell Gallery"
     }
     if(!($Error))
     {
@@ -136,12 +162,12 @@ Function Install-HPCMSLRemote
     }
 }
 
-#Update the NuGet package provider
 Function Update-NuGet
 {
+    #Update the NuGet package provider
+
     #Check if the NuGet package provider is installed
     $Nuget = Get-PackageProvider | Where-Object Name -eq "NuGet"
-
     #If NuGet is installed, ensure it is the current version
     if($Nuget)
     {
@@ -151,7 +177,6 @@ Function Update-NuGet
         $Revision = $Nuget.Version | Select-Object -ExpandProperty Revision
         $NugetLocalVersion = "$($Major)." + "$($Minor)." + "$($Build)." + "$($Revision)"
         $NugetWebVersion = Find-PackageProvider NuGet | Select-Object -ExpandProperty Version
-
         if($NugetLocalVersion -ge $NugetWebVersion)
         {
             Write-LogEntry -Value "The latest version of the NuGet package provider ($NugetLocalVersion) is already installed" -Severity 1
@@ -195,14 +220,14 @@ Function Update-NuGet
     }
 }
 
-#Update the PowerShellGet module
 Function Update-PowerShellGet
 {
+    #Update the PowerShellGet module
+
     Import-Module -Name PowerShellGet -Force
     $PsGetVersion = Get-Module PowerShellGet | Select-Object -ExpandProperty Version
     $PsGetVersionFull = "$($PsGetVersion.Major)." + "$($PsGetVersion.Minor)." + "$($PsGetVersion.Build)"
     $PsGetVersionWeb = Find-Package -Name PowerShellGet | Select-Object -ExpandProperty Version
-
     if($PsGetVersionFull -ge $PsGetVersionWeb)
     {
         Write-LogEntry -Value "The latest version of the PowerShellGet module ($PsGetVersionFull) is already installed" -Severity 1
@@ -231,9 +256,10 @@ Function Update-PowerShellGet
     }
 }
 
-#Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
 Function Write-LogEntry
 {
+    #Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
+
 	param(
 		[parameter(Mandatory = $true, HelpMessage = "Value added to the log file.")]
 		[ValidateNotNullOrEmpty()]
@@ -244,12 +270,11 @@ Function Write-LogEntry
 		[string]$Severity,
 		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
 		[ValidateNotNullOrEmpty()]
-		[string]$FileName = "Install-HPCMSL.log"
+		[string]$FileName = ($script:LogFile | Split-Path -Leaf)
 	)
-    # Determine log file location
+    #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-		
-    # Construct time stamp for log entry
+    #Construct time stamp for log entry
     if(-not(Test-Path -Path 'variable:global:TimezoneBias'))
     {
         [string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
@@ -263,17 +288,13 @@ Function Write-LogEntry
         }
     }
     $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
-		
-    # Construct date for log entry
+    #Construct date for log entry
     $Date = (Get-Date -Format "MM-dd-yyyy")
-		
-    # Construct context for log entry
+    #Construct context for log entry
     $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
-		
-    # Construct final log entry
+    #Construct final log entry
     $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Install-HPCMSL"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
-		
-    # Add value to log file
+    #Add value to log file
     try
     {
         Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
@@ -300,15 +321,22 @@ if(Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:ProgramData\BiosScripts\HP"
+	$LogsDirectory = ($LogFile | Split-Path)
 	if(!(Test-Path -PathType Container $LogsDirectory))
 	{
-		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
+		try
+		{
+			New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
+		}
+		catch
+		{
+			throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+		}
 	}
 }
 
 if(!($Rerun)){
-    Write-Output "Log path set to $LogsDirectory\Install-HPCMSL.log"
+    Write-Output "Log path set to $LogFile"
     Write-LogEntry -Value "START - HP Client Management Script Library installation script" -Severity 1
 
     #Make sure the folder names in the ModulePath match the HPCMSL folder names
@@ -326,8 +354,7 @@ if(!($Rerun)){
         }
         if($InvalidFolder)
         {
-            Write-LogEntry -Value 'Valid folder names are: "HP.ClientManagement" "HP.Firmware" "HP.Private" "HP.Repo" "HP.Sinks" "HP.Softpaq" "HP.Utility" "HPCMSL"' -Severity 2
-            throw "Invalid folder names found in $ModulePath. See the log file for more details"
+            Stop-Script -ErrorMessage "Invalid folder names found in $ModulePath. Valid folder names are: ""HP.ClientManagement"" ""HP.Firmware"" ""HP.Private"" ""HP.Repo"" ""HP.Sinks"" ""HP.Softpaq"" ""HP.Utility"" ""HPCMSL"""
         }
         else
         {
@@ -372,16 +399,13 @@ if(!($Rerun)){
     $PsVerMajor = $PSVersionTable.PSVersion | Select-Object -ExpandProperty Major
     $PsVerMinor = $PSVersionTable.PSVersion | Select-Object -ExpandProperty Minor
     $PsVerFull = "$($PsVerMajor)." + "$($PsVerMinor)."
-
     if($PsVerFull -ge 5.1)
     {
         Write-LogEntry -Value "The current PowerShell version is $PsVerFull" -Severity 1
     }
     else
     {
-        $ErrMsg = "The current PowerShell version is $PsVerFull. The mininum supported PowerShell version is 5.1"
-        Write-LogEntry -Value $ErrMsg -Severity 3
-        throw $ErrMsg
+        Stop-Script -ErrorMessage "The current PowerShell version is $PsVerFull. The mininum supported PowerShell version is 5.1"
     }
 
     #Set the PowerShell Module insatll path
@@ -390,7 +414,6 @@ if(!($Rerun)){
     #Get the versions of the currently installed HPCMSL modules
     Write-LogEntry -Value "Checking the versions of the currently installed HPCMSL modules" -Severity 1
     $LocalModuleVersions = [PSCustomObject]@{}
-
     ForEach($HPModule in $HPModules){
         if(Test-Path "$ModuleInstallPath\WindowsPowerShell\Modules\$HPModule")
         {
@@ -446,7 +469,6 @@ if($ModulePath)
         {
             Write-LogEntry -Value "Failed to check the version of the $HPModule module in $ModulePath" -Severity 3
         }
-
         if($NULL -ne $SourceVersion)
         {
             $LocalVersionCompare = ([Version]$SourceVersion).CompareTo([Version]$LocalModuleVersions.$HPModule)
@@ -481,7 +503,6 @@ else
         Write-LogEntry -Value "Checking the version of the PowerShellGet module" -Severity 1
         Update-PowerShellGet
     }
-
     #Get the version of the HPCMSL module in the PowerShell Gallery
     Write-LogEntry -Value "Checking the version of the HPCMSL module in the PowerShell Gallery" -Severity 1
     try
@@ -496,7 +517,6 @@ else
     {
         Write-LogEntry -Value "Failed to check the version of the HPCMSL module in the PowerShell Gallery" -Severity 3
     }
-
     if($NULL -ne $WebVersion)
     {
         $WebVersionCompare = ([Version]$WebVersion).CompareTo([Version]$LocalModuleVersions.HPCMSL)
@@ -532,8 +552,7 @@ try
 }
 catch 
 {
-    Write-LogEntry -Value "Failed to import the HPCMSL module" -Severity 3
-    throw "Failed to import the HPCMSL module"
+    Stop-Script -ErrorMessage "Failed to import the HPCMSL module" -Exception $PSItem.Exception.Message
 }
 if(!($Error))
 {

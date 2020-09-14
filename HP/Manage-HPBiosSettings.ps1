@@ -23,6 +23,9 @@
     .PARAMETER SetupPassword
         The current BIOS password
 
+    .PARAMETER LogFile
+        Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
+
     .EXAMPLE
         #Set BIOS settings supplied in the script
         Manage-HPBiosSettings.ps1 -SetSettings -SetupPassword ExamplePassword
@@ -48,6 +51,9 @@
                      Added the SetSettings parameter to indicate that the script should attempt to set settings
                      Changed the $Settings array in the script to be comma seperated instead of semi-colon seperated
                      Updated formatting
+        2020-09-14 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\HP.
+                     Consolidated duplicate code into new functions (Stop-Script, Get-WmiData). Made a number of minor formatting and syntax changes
+
 #>
 
 #Parameters ===================================================================================================================
@@ -63,7 +69,15 @@ param(
         }
         return $true 
     })]
-    [System.IO.FileInfo]$CsvPath
+    [System.IO.FileInfo]$CsvPath,
+    [Parameter(Mandatory=$false)][ValidateScript({
+        if($_ -notmatch "(\.log)")
+        {
+            throw "The file specified in the LogFile paramter must be a .log file"
+        }
+        return $true
+    })]
+    [System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\HP\Manage-HPBiosSettings.log"
 )
 
 #List of settings to be configured ============================================================================================
@@ -91,15 +105,14 @@ $Settings = (
 
 #Functions ====================================================================================================================
 
-#Determine if a task sequence is currently running
 Function Get-TaskSequenceStatus
 {
+    #Determine if a task sequence is currently running
 	try
 	{
 		$TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
 	}
 	catch{}
-
     if($NULL -eq $TSEnv)
 	{
 		return $False
@@ -111,7 +124,6 @@ Function Get-TaskSequenceStatus
 			$SMSTSType = $TSEnv.Value("_SMSTSType")
 		}
 		catch{}
-
 		if($NULL -eq $SMSTSType)
 		{
 			return $False
@@ -123,22 +135,91 @@ Function Get-TaskSequenceStatus
 	}
 }
 
-#Set a specific HP BIOS setting
+Function Stop-Script
+{
+    #Write an error to the log file and terminate the script
+
+    param(
+        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ErrorMessage,
+        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Exception
+    )
+    Write-LogEntry -Value $ErrorMessage -Severity 3
+    if($Exception)
+    {
+        Write-LogEntry -Value "Exception Message: $Exception" -Severity 3
+    }
+    throw $ErrorMessage
+}
+
+Function Get-WmiData
+{
+	#Gets WMI data using either the WMI or CIM cmdlets and stores the data in a variable
+
+    param(
+        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
+        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ClassName,
+        [Parameter(Mandatory=$true)][ValidateSet('CIM','WMI')]$CmdletType,
+        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
+    )
+    try
+    {
+        if($CmdletType -eq "CIM")
+        {
+            if($Select)
+            {
+				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
+                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop | Select-Object $Select -ErrorAction Stop
+            }
+            else
+            {
+				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
+                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop
+            }
+        }
+        elseif($CmdletType -eq "WMI")
+        {
+            if($Select)
+            {
+				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
+                $Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction Stop | Select-Object $Select -ErrorAction Stop
+            }
+            else
+            {
+				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
+                $Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction Stop
+            }
+        }
+    }
+    catch
+    {
+		if($Select)
+		{
+			Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message
+		}
+		else
+		{
+			Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message	
+		}
+	}
+	Write-LogEntry -Value "Successfully connected to the $ClassName WMI class" -Severity 1
+	return $Query
+}
+
 Function Set-HPBiosSetting
 {
+    #Set a specific HP BIOS setting
+
     param(
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Name,
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Value,
         [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Password
     )
-
     #Ensure the specified setting exists and get the possible values
     $CurrentSetting = $SettingList | Where-Object Name -eq $Name | Select-Object -ExpandProperty Value
     if($NULL -ne $CurrentSetting)
     {
         #Split the current values
         $CurrentSettingSplit = $CurrentSetting.Split(',')
-
         #Find the currently set value
         $Count = 0
         while($Count -lt $CurrentSettingSplit.Count)
@@ -170,8 +251,6 @@ Function Set-HPBiosSetting
             {
                 $SettingResult = ($Interface.SetBIOSSetting($Name,$Value)).Return
             }
-            
-
             if($SettingResult -eq 0)
             {
                 Write-LogEntry -Value "Successfully set ""$Name"" to ""$Value""" -Severity 1
@@ -192,9 +271,10 @@ Function Set-HPBiosSetting
     }
 }
 
-#Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
 Function Write-LogEntry
 {
+    #Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
+
 	param(
 		[parameter(Mandatory = $true, HelpMessage = "Value added to the log file.")]
 		[ValidateNotNullOrEmpty()]
@@ -205,12 +285,11 @@ Function Write-LogEntry
 		[string]$Severity,
 		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
 		[ValidateNotNullOrEmpty()]
-		[string]$FileName = "Manage-HPBiosSettings.log"
+		[string]$FileName = ($script:LogFile | Split-Path -Leaf)
 	)
-    # Determine log file location
+    #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-		
-    # Construct time stamp for log entry
+    #Construct time stamp for log entry
     if(-not(Test-Path -Path 'variable:global:TimezoneBias'))
     {
         [string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
@@ -224,17 +303,13 @@ Function Write-LogEntry
         }
     }
     $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
-		
-    # Construct date for log entry
+    #Construct date for log entry
     $Date = (Get-Date -Format "MM-dd-yyyy")
-		
-    # Construct context for log entry
+    #Construct context for log entry
     $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
-		
-    # Construct final log entry
+    #Construct final log entry
     $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-HPBiosSettings"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
-		
-    # Add value to log file
+    #Add value to log file
     try
     {
         Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
@@ -255,88 +330,45 @@ if(Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:ProgramData\BiosScripts\HP"
+	$LogsDirectory = ($LogFile | Split-Path)
 	if(!(Test-Path -PathType Container $LogsDirectory))
 	{
-		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
+		try
+		{
+			New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
+		}
+		catch
+		{
+			throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+		}
 	}
 }
-Write-Output "Log path set to $LogsDirectory\Manage-HPBiosSettings.log"
+Write-Output "Log path set to $LogFile"
 Write-LogEntry -Value "START - HP BIOS settings management script" -Severity 1
 
 #Connect to the HP_BIOSEnumeration WMI class
-$Error.Clear()
-try
-{
-    Write-LogEntry -Value "Connect to the HP_BIOSEnumeration WMI class" -Severity 1
-    $SettingList = Get-WmiObject -Namespace root\HP\InstrumentedBIOS -Class HP_BIOSEnumeration
-}
-catch
-{
-    Write-LogEntry -Value "Unable to connect to the HP_BIOSEnumeration WMI class" -Severity 3
-    throw "Unable to connect to the HP_BIOSEnumeration WMI class"
-}
-if(!($Error))
-{
-	Write-LogEntry -Value "Successfully connected to the HP_BIOSEnumeration WMI class" -Severity 1
-}
+$SettingList = Get-WmiData -Namespace root\hp\InstrumentedBIOS -ClassName HP_BIOSEnumeration -CmdletType WMI
 
 #Connect to the HP_BIOSSettingInterface WMI class
-$Error.Clear()
-try
-{
-    Write-LogEntry -Value "Connect to the HP_BIOSSettingInterface WMI class" -Severity 1
-    $Interface = Get-WmiObject -Namespace root\HP\InstrumentedBIOS -Class HP_BIOSSettingInterface
-}
-catch
-{
-    Write-LogEntry -Value "Unable to connect to the HP_BIOSSettingInterface WMI class" -Severity 3
-    throw "Unable to connect to the HP_BIOSSettingInterface WMI class"
-}
-if(!($Error))
-{
-	Write-LogEntry -Value "Successfully connected to the HP_BIOSSettingInterface WMI class" -Severity 1
-}
+$Interface = Get-WmiData -Namespace root\hp\InstrumentedBIOS -ClassName HP_BIOSSettingInterface -CmdletType WMI
 
 #Connect to the HP_BIOSSetting WMI class
-$Error.Clear()
-try
-{
-    Write-LogEntry -Value "Connect to the HP_BIOSSetting WMI class" -Severity 1
-    $HPBiosSetting = Get-WmiObject -Namespace root\HP\InstrumentedBIOS -Class HP_BIOSSetting
-}
-catch
-{
-    Write-LogEntry -Value "Unable to connect to the HP_BIOSSetting WMI class" -Severity 3
-    throw "Unable to connect to the HP_BIOSSetting WMI class"
-}
-if(!($Error))
-{
-	Write-LogEntry -Value "Successfully connected to the HP_BIOSSetting WMI class" -Severity 1
-}
+$HPBiosSetting = Get-WmiData -Namespace root\hp\InstrumentedBIOS -ClassName HP_BIOSSetting -CmdletType WMI
 
 #Parameter validation
 Write-LogEntry -Value "Begin parameter validation" -Severity 1
-
 if($GetSettings -and $SetSettings)
 {
-	$ErrorMsg = "Cannot specify the GetSettings and SetSettings parameters at the same time"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
+    Stop-Script -ErrorMessage "Cannot specify the GetSettings and SetSettings parameters at the same time"
 }
 if(!($GetSettings -or $SetSettings))
 {
-	$ErrorMsg = "One of the GetSettings or SetSettings parameters must be specified when running this script"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
+    Stop-Script -ErrorMessage "One of the GetSettings or SetSettings parameters must be specified when running this script"
 }
 if($SetSettings -and !($Settings -or $CsvPath))
 {
-	$ErrorMsg = "Settings must be specified using either the Settings variable in the script or the CsvPath parameter"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
+    Stop-Script -ErrorMessage "Settings must be specified using either the Settings variable in the script or the CsvPath parameter"
 }
-
 Write-LogEntry -Value "Parameter validation completed" -Severity 1
 
 #Set counters to 0
@@ -353,14 +385,12 @@ if($SetSettings)
 {
     Write-LogEntry -Value "Check current BIOS setup password status" -Severity 1
     $PasswordCheck = ($HPBiosSetting | Where-Object Name -eq "Setup Password").IsSet
-
     if($PasswordCheck -eq 1)
     {
         #Setup password set but parameter not specified
         if([String]::IsNullOrEmpty($SetupPassword))
         {
-            Write-LogEntry -Value "The BIOS setup password is set, but no password was supplied. Use the SetupPassword parameter when a password is set" -Severity 3
-            throw "The BIOS setup password is set, but no password was supplied. Use the SetupPassword parameter when a password is set"
+            Stop-Script -ErrorMessage "The BIOS setup password is set, but no password was supplied. Use the SetupPassword parameter when a password is set"
         }
         #Setup password set correctly
         if(($Interface.SetBIOSSetting("Setup Password","<utf-16/>" + $SetupPassword,"<utf-16/>" + $SetupPassword)).Return -eq 0)
@@ -370,8 +400,7 @@ if($SetSettings)
         #Setup password not set correctly
         else
         {
-            Write-LogEntry -Value "The specified setup password does not match the currently set password" -Severity 3
-            throw "The specified setup password does not match the currently set password"
+            Stop-Script -ErrorMessage "The specified setup password does not match the currently set password"
         }
     }
     else
@@ -387,7 +416,6 @@ if($GetSettings)
     $SettingObject = ForEach($Setting in $SettingList){
         #Split the current values
         $SettingSplit = ($Setting.Value).Split(',')
-
         #Find the currently set value
         $SplitCount = 0
         while($SplitCount -lt $SettingSplit.Count)
@@ -407,7 +435,6 @@ if($GetSettings)
             Value = $SetValue
         }
     }
-
     if($CsvPath)
     {
         $SettingObject | Export-Csv -Path $CsvPath -NoTypeInformation
@@ -418,7 +445,7 @@ if($GetSettings)
         Write-Output $SettingObject    
     }
 }
-
+#Set settings
 if($SetSettings)
 {
     if($CsvPath)
@@ -426,7 +453,6 @@ if($SetSettings)
         Clear-Variable Settings -ErrorAction SilentlyContinue
         $Settings = Import-Csv -Path $CsvPath
     }
-
     #Set HP BIOS settings - password is set
     if($PasswordCheck -eq 1)
     {
