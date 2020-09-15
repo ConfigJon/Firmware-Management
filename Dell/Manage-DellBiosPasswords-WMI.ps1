@@ -35,8 +35,8 @@
 	.PARAMETER SMSTSPasswordRetry
 		For use in a task sequence. If specified, the script will assume the script needs to run at least one more time. This will ignore password errors and suppress user prompts.
 
-    .PARAMETER LogFile
-        Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
+	.PARAMETER LogFile
+		Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
 	.EXAMPLE
 		Set a new admin password
@@ -54,7 +54,10 @@
 	.NOTES
 		Created by: Jon Anderson (@ConfigJon)
 		Reference: https://www.configjon.com/dell-bios-password-management-wmi/
-		Modified: 2020-09-11
+		Modified: 2020-09-14
+
+	.CHANGELOG
+		2020-09-14 - When using the AdminSet and SystemSet parameters, the OldPassword parameters are no longer required. There is now logic to handle and report this type of failure.
 
 #>
 
@@ -73,13 +76,13 @@ param(
 	[Parameter(Mandatory=$false)][Switch]$ContinueOnError,
 	[Parameter(Mandatory=$false)][Switch]$SMSTSPasswordRetry,
 	[Parameter(Mandatory=$false)][ValidateScript({
-        if($_ -notmatch "(\.log)")
-        {
-            throw "The file specified in the LogFile paramter must be a .log file"
-        }
-        return $true
-    })]
-    [System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\Dell\Manage-DellBiosPasswords-WMI.log"
+		if($_ -notmatch "(\.log)")
+		{
+			throw "The file specified in the LogFile paramter must be a .log file"
+		}
+		return $true
+	})]
+	[System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\Dell\Manage-DellBiosPasswords-WMI.log"
 )
 
 #Functions ====================================================================================================================
@@ -134,39 +137,39 @@ Function Get-WmiData
 {
 	#Gets WMI data using either the WMI or CIM cmdlets and stores the data in a variable
 
-    param(
-        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
-        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ClassName,
-        [Parameter(Mandatory=$true)][ValidateSet('CIM','WMI')]$CmdletType,
-        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
+	param(
+		[Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
+		[Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ClassName,
+		[Parameter(Mandatory=$true)][ValidateSet('CIM','WMI')]$CmdletType,
+		[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
 	)
 	$Counter = 0
 	while($Counter -lt 6)
 	{
-       	if($CmdletType -eq "CIM")
-       	{
-           	if($Select)
-           	{
+		if($CmdletType -eq "CIM")
+		{
+			if($Select)
+			{
 				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-               	$Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
-           	}
-           	else
-           	{
+				$Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
+			}
+			else
+			{
 				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-               	$Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue
-           	}
-       	}
-       	elseif($CmdletType -eq "WMI")
-       	{
-           	if($Select)
-           	{
+				$Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue
+			}
+		}
+		elseif($CmdletType -eq "WMI")
+		{
+			if($Select)
+			{
 				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-               	$Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
-           	}
-           	else
-           	{
+				$Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
+			}
+			else
+			{
 				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-               	$Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction SilentlyContinue
+				$Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction SilentlyContinue
 			}
 		}
 		if($Query -eq $NULL)
@@ -245,7 +248,7 @@ Function Set-DellBiosPassword
 	param(
 		[Parameter(Mandatory=$true)][ValidateSet('Admin','System')]$PasswordType,
 		[Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Password,
-		[Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String[]]$OldPassword
+		[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$OldPassword
 	)
 	#Encode the password
 	$PasswordBytes = $Script:Encoder.GetBytes($Password)
@@ -269,33 +272,40 @@ Function Set-DellBiosPassword
 	#Password is not set to correct value
 	else
 	{
-		$Counter = 0
-		while($Counter -lt $OldPassword.Count)
+		if($OldPassword)
 		{
-			#Encode the old password
-			$OldBytes = $Script:Encoder.GetBytes($OldPassword[$Counter])
-			#Attempt to change the password
-			if(($SecurityInterface.SetNewPassword(1,$OldBytes.Length,$OldBytes,$PasswordType,$OldPassword[$Counter],$Password)).Status -eq 0)
+			$Counter = 0
+			while($Counter -lt $OldPassword.Count)
 			{
-				#Successfully changed the password
-				Set-Variable -Name "$($PasswordType)PWSet" -Value "Success" -Scope Script
-				if(Get-TaskSequenceStatus)
+				#Encode the old password
+				$OldBytes = $Script:Encoder.GetBytes($OldPassword[$Counter])
+				#Attempt to change the password
+				if(($SecurityInterface.SetNewPassword(1,$OldBytes.Length,$OldBytes,$PasswordType,$OldPassword[$Counter],$Password)).Status -eq 0)
 				{
-					$TSEnv.Value("DellSet$($PasswordType)") = "Success"
+					#Successfully changed the password
+					Set-Variable -Name "$($PasswordType)PWSet" -Value "Success" -Scope Script
+					if(Get-TaskSequenceStatus)
+					{
+						$TSEnv.Value("DellSet$($PasswordType)") = "Success"
+					}
+					Write-LogEntry -Value "The $PasswordType password has been successfully changed" -Severity 1
+					break
 				}
-				Write-LogEntry -Value "The $PasswordType password has been successfully changed" -Severity 1
-				break
+				else
+				{
+					#Failed to change the password
+					$Counter++
+				}
 			}
-			else
+			#Report password change failure
+			if((Get-Variable -Name "$($PasswordType)PWSet" -ValueOnly -Scope Script) -eq "Failed")
 			{
-				#Failed to change the password
-				$Counter++
+				Write-LogEntry -Value "Failed to change the $PasswordType password" -Severity 3
 			}
 		}
-		#Report password change failure
-		if((Get-Variable -Name "$($PasswordType)PWSet" -ValueOnly -Scope Script) -eq "Failed")
+		else
 		{
-			Write-LogEntry -Value "Failed to change the $PasswordType password" -Severity 3
+			Write-LogEntry -Value "The $PasswordType password is currently set to something other than then supplied value, but no old passwords were supplied. Try supplying additional values using the Old$($PasswordType)Password parameter" -Severity 3
 		}
 	}
 }
@@ -346,12 +356,12 @@ Function Start-UserPrompt
 {
 	#Create a user prompt with custom body and title text if the NoUserPrompt variable is not set
 
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$True)][ValidateNotNullOrEmpty()][String[]]$BodyText,
-        [Parameter(Mandatory=$True)][ValidateNotNullOrEmpty()][String[]]$TitleText
-    )	
-    if(!($NoUserPrompt))
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory=$True)][ValidateNotNullOrEmpty()][String[]]$BodyText,
+		[Parameter(Mandatory=$True)][ValidateNotNullOrEmpty()][String[]]$TitleText
+	)	
+	if(!($NoUserPrompt))
 	{
 		(New-Object -ComObject Wscript.Shell).Popup("$BodyText",0,"$TitleText",0x0 + 0x30) | Out-Null
 	}
@@ -469,10 +479,6 @@ if(($AdminSet) -and !($AdminPassword))
 {
 	Stop-Script -ErrorMessage "When using the AdminSet switch, the AdminPassword parameter must also be specified"
 }
-if(($AdminSet -and $AdminPasswordCheck -eq 1) -and !($OldAdminPassword))
-{
-	Stop-Script -ErrorMessage "When using the AdminSet switch where a admin password exists, the OldAdminPassword parameter must also be specified"
-}
 if(($AdminClear) -and !($OldAdminPassword))
 {
 	Stop-Script -ErrorMessage "When using the AdminClear switch, the OldAdminPassword parameter must also be specified"
@@ -480,10 +486,6 @@ if(($AdminClear) -and !($OldAdminPassword))
 if(($SystemSet) -and !($SystemPassword))
 {
 	Stop-Script -ErrorMessage "When using the SystemSet switch, the SystemPassword parameter must also be specified"
-}
-if(($SystemSet -and $SystemPasswordCheck -eq 1) -and !($OldSystemPassword))
-{
-	Stop-Script -ErrorMessage "When using the SystemSet switch where a system password exists, the OldSystemPassword parameter must also be specified"
 }
 if(($SystemSet -and $AdminPasswordCheck -eq 1) -and !($AdminPassword))
 {
@@ -569,7 +571,7 @@ if($AdminPasswordCheck -eq 0)
 		{
 			New-DellBiosPassword -PasswordType Admin -Password $AdminPassword
 		}
-    }
+	}
 }
 
 #No system password currently set
@@ -600,7 +602,14 @@ if($AdminPasswordCheck -eq 1)
 	#Change the existing admin password
 	if(($AdminSet) -and ($DellSetAdmin -ne "Success"))
 	{
-		Set-DellBiosPassword -PasswordType Admin -Password $AdminPassword -OldPassword $OldAdminPassword
+		if($OldAdminPassword)
+		{
+			Set-DellBiosPassword -PasswordType Admin -Password $AdminPassword -OldPassword $OldAdminPassword
+		}
+		else
+		{
+			Set-DellBiosPassword -PasswordType Admin -Password $AdminPassword
+		}
 	}
 	#Clear the existing admin password
 	if(($AdminClear) -and ($DellClearAdmin -ne "Success"))
@@ -615,7 +624,14 @@ if($SystemPasswordCheck -eq 1)
 	#Change the existing system password
 	if(($SystemSet) -and ($DellSetSystem -ne "Success"))
 	{
-		Set-DellBiosPassword -PasswordType System -Password $SystemPassword -OldPassword $OldSystemPassword
+		if($OldSystemPassword)
+		{
+			Set-DellBiosPassword -PasswordType System -Password $SystemPassword -OldPassword $OldSystemPassword
+		}
+		else
+		{
+			Set-DellBiosPassword -PasswordType System -Password $SystemPassword
+		}
 	}
 	#Clear the existing system password
 	if(($SystemClear) -and ($DellClearSystem -ne "Success"))
