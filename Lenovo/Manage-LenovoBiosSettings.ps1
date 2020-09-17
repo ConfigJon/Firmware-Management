@@ -12,11 +12,23 @@
         The path to the CSV file to be imported or exported
 
     .PARAMETER SupervisorPassword
-        The current BIOS password
+        The current supervisor password
+
+    .PARAMETER SystemManagementPassword
+        The current system management password
+
+    .PARAMETER LogFile
+        Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
     .EXAMPLE
-        #Set BIOS settings supplied in the script
+        #Set BIOS settings supplied in the script when no password is set
+        Manage-LenovoBiosSettings.ps1 -SetSettings
+    
+        #Set BIOS settings supplied in the script when the supervisor password is set
         Manage-LenovoBiosSettings.ps1 -SetSettings -SupervisorPassword ExamplePassword
+
+        #Set BIOS settings supplied in the script when the system management password is set
+        Manage-LenovoBiosSettings.ps1 -SetSettings -SystemManagementPassword ExamplePassword
 
         #Set BIOS settings supplied in a CSV file
         Manage-LenovoBiosSettings.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -SupervisorPassword ExamplePassword
@@ -30,7 +42,7 @@
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
         Reference: https://www.configjon.com/lenovo-bios-settings-management/
-        Modified: 2020-02-21
+        Modified: 2020-09-16
 
     .CHANGELOG
         2019-11-04 - Added additional logging. Changed the default log path to $ENV:ProgramData\BiosScripts\Lenovo.
@@ -40,6 +52,11 @@
                      Added the SetSettings parameter to indicate that the script should attempt to set settings
                      Changed the $Settings array in the script to be comma seperated instead of semi-colon seperated
                      Updated formatting
+        2020-09-16 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Lenovo.
+                     Consolidated duplicate code into new functions (Stop-Script, Get-WmiData). Made a number of minor formatting and syntax changes
+                     Updated the save BIOS settings section with better logic to work when a password is set. Credit to CharlesNRU for pointing out this fix.
+                     Added support for for using the system management password
+
 #>
 
 #Parameters ===================================================================================================================
@@ -48,6 +65,7 @@ param(
     [Parameter(Mandatory=$false)][Switch]$GetSettings,
     [Parameter(Mandatory=$false)][Switch]$SetSettings,    
     [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$SupervisorPassword,
+    [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$SystemManagementPassword,
     [ValidateScript({
         if($_ -notmatch "(\.csv)")
         {
@@ -55,7 +73,15 @@ param(
         }
         return $true 
     })]
-    [System.IO.FileInfo]$CsvPath
+    [System.IO.FileInfo]$CsvPath,
+    [Parameter(Mandatory=$false)][ValidateScript({
+        if($_ -notmatch "(\.log)")
+        {
+            throw "The file specified in the LogFile paramter must be a .log file"
+        }
+        return $true
+    })]
+    [System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\Lenovo\Manage-LenovoBiosSettings.log"
 )
 
 #List of settings to be configured ============================================================================================
@@ -83,15 +109,14 @@ $Settings = (
 
 #Functions ====================================================================================================================
 
-#Determine if a task sequence is currently running
 Function Get-TaskSequenceStatus
 {
+    #Determine if a task sequence is currently running
 	try
 	{
 		$TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
 	}
 	catch{}
-
 	if($NULL -eq $TSEnv)
 	{
 		return $False
@@ -103,7 +128,6 @@ Function Get-TaskSequenceStatus
 			$SMSTSType = $TSEnv.Value("_SMSTSType")
 		}
 		catch{}
-
 		if($NULL -eq $SMSTSType)
 		{
 			return $False
@@ -115,15 +139,85 @@ Function Get-TaskSequenceStatus
 	}
 }
 
-#Set a specific Lenovo BIOS setting
+Function Stop-Script
+{
+    #Write an error to the log file and terminate the script
+
+    param(
+        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ErrorMessage,
+        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Exception
+    )
+    Write-LogEntry -Value $ErrorMessage -Severity 3
+    if($Exception)
+    {
+        Write-LogEntry -Value "Exception Message: $Exception" -Severity 3
+    }
+    throw $ErrorMessage
+}
+
+Function Get-WmiData
+{
+	#Gets WMI data using either the WMI or CIM cmdlets and stores the data in a variable
+
+    param(
+        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
+        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ClassName,
+        [Parameter(Mandatory=$true)][ValidateSet('CIM','WMI')]$CmdletType,
+        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
+    )
+    try
+    {
+        if($CmdletType -eq "CIM")
+        {
+            if($Select)
+            {
+				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
+                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop | Select-Object $Select -ErrorAction Stop
+            }
+            else
+            {
+				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
+                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop
+            }
+        }
+        elseif($CmdletType -eq "WMI")
+        {
+            if($Select)
+            {
+				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
+                $Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction Stop | Select-Object $Select -ErrorAction Stop
+            }
+            else
+            {
+				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
+                $Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction Stop
+            }
+        }
+    }
+    catch
+    {
+		if($Select)
+		{
+			Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message
+		}
+		else
+		{
+			Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message	
+		}
+	}
+	Write-LogEntry -Value "Successfully connected to the $ClassName WMI class" -Severity 1
+	return $Query
+}
+
 Function Set-LenovoBiosSetting
 {
-    param (
+    #Set a specific Lenovo BIOS setting
+
+    param(
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Name,
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Value,
         [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Password
     )
-
     #Ensure the specified setting exists and get the possible values
     $CurrentSetting = $SettingList | Where-Object CurrentSetting -Like "$Name*" | Select-Object -ExpandProperty CurrentSetting
     if($NULL -ne $CurrentSetting)
@@ -138,7 +232,6 @@ Function Set-LenovoBiosSetting
         {
             $CurrentSettingSplit = $CurrentSetting.Split(',')
         }
-
         #Setting is already set to specified value
         if($CurrentSettingSplit[1] -eq $Value)
         {
@@ -178,9 +271,10 @@ Function Set-LenovoBiosSetting
     }
 }
 
-#Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
 Function Write-LogEntry
 {
+    #Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
+
 	param(
 		[parameter(Mandatory = $true, HelpMessage = "Value added to the log file.")]
 		[ValidateNotNullOrEmpty()]
@@ -191,12 +285,11 @@ Function Write-LogEntry
 		[string]$Severity,
 		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
 		[ValidateNotNullOrEmpty()]
-		[string]$FileName = "Manage-LenovoBiosSettings.log"
+		[string]$FileName = ($script:LogFile | Split-Path -Leaf)
 	)
-    # Determine log file location
+    #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-		
-    # Construct time stamp for log entry
+    #Construct time stamp for log entry
     if(-not(Test-Path -Path 'variable:global:TimezoneBias'))
     {
         [string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
@@ -210,17 +303,13 @@ Function Write-LogEntry
         }
     }
     $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
-		
-    # Construct date for log entry
+    #Construct date for log entry
     $Date = (Get-Date -Format "MM-dd-yyyy")
-		
-    # Construct context for log entry
+    #Construct context for log entry
     $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
-		
-    # Construct final log entry
+    #Construct final log entry
     $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-LenovoBiosSettings"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
-		
-    # Add value to log file
+    #Add value to log file
     try
     {
         Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
@@ -241,122 +330,58 @@ if(Get-TaskSequenceStatus)
 }
 else
 {
-	$LogsDirectory = "$ENV:ProgramData\BiosScripts\Lenovo"
-	if(!(Test-Path -PathType Container $LogsDirectory))
-	{
-		New-Item -Path $LogsDirectory -ItemType "Directory" -Force | Out-Null
+	$LogsDirectory = ($LogFile | Split-Path)
+    if([string]::IsNullOrEmpty($LogsDirectory))
+    {
+        $LogsDirectory = $PSScriptRoot
+    }
+    else
+    {
+        if(!(Test-Path -PathType Container $LogsDirectory))
+	    {
+		    try
+		    {
+			    New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
+		    }
+		    catch
+		    {
+			    throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+            }
+        }
 	}
 }
-Write-Output "Log path set to $LogsDirectory\Manage-LenovoBiosSettings.log"
+Write-Output "Log path set to $LogFile"
 Write-LogEntry -Value "START - Lenovo BIOS settings management script" -Severity 1
 
 #Connect to the Lenovo_BiosSetting WMI class
-$Error.Clear()
-try
-{
-    Write-LogEntry -Value "Connect to the Lenovo_BiosSetting WMI class" -Severity 1
-    $SettingList = Get-WmiObject -Namespace root\wmi -Class Lenovo_BiosSetting
-}
-catch
-{
-    Write-LogEntry -Value "Unable to connect to the Lenovo_BiosSetting WMI class" -Severity 3
-    throw "Unable to connect to the Lenovo_BiosSetting WMI class"
-}
-if(!($Error))
-{
-	Write-LogEntry -Value "Successfully connected to the Lenovo_BiosSetting WMI class" -Severity 1
-}
+$SettingList = Get-WmiData -Namespace root\wmi -ClassName Lenovo_BiosSetting -CmdletType WMI
 
 #Connect to the Lenovo_SetBiosSetting WMI class
-$Error.Clear()
-try
-{
-    Write-LogEntry -Value "Connect to the Lenovo_SetBiosSetting WMI class" -Severity 1
-    $Interface = Get-WmiObject -Namespace root\wmi -Class Lenovo_SetBiosSetting
-}
-catch
-{
-    Write-LogEntry -Value "Unable to connect to the Lenovo_SetBiosSetting WMI class" -Severity 3
-    throw "Unable to connect to the Lenovo_SetBiosSetting WMI class"
-}
-if(!($Error))
-{
-	Write-LogEntry -Value "Successfully connected to the Lenovo_SetBiosSetting WMI class" -Severity 1
-}
+$Interface = Get-WmiData -Namespace root\wmi -ClassName Lenovo_SetBiosSetting -CmdletType WMI
 
 #Connect to the Lenovo_SaveBiosSettings WMI class
-$Error.Clear()
-try
-{
-    Write-LogEntry -Value "Connect to the Lenovo_SaveBiosSettings WMI class" -Severity 1
-    $SaveSettings = Get-WmiObject -Namespace root\wmi -Class Lenovo_SaveBiosSettings
-}
-catch
-{
-    Write-LogEntry -Value "Unable to connect to the Lenovo_SaveBiosSettings WMI class" -Severity 3
-    throw "Unable to connect to the Lenovo_SaveBiosSettings WMI class"
-}
-if(!($Error))
-{
-	Write-LogEntry -Value "Successfully connected to the Lenovo_SaveBiosSettings WMI class" -Severity 1
-}
+$SaveSettings = Get-WmiData -Namespace root\wmi -ClassName Lenovo_SaveBiosSettings -CmdletType WMI
 
 #Connect to the Lenovo_BiosPasswordSettings WMI class
-$Error.Clear()
-try
-{
-	Write-LogEntry -Value "Connect to the Lenovo_BiosPasswordSettings WMI class" -Severity 1
-	$PasswordSettings = Get-WmiObject -Namespace root\wmi -Class Lenovo_BiosPasswordSettings
-}
-catch
-{
-	Write-LogEntry -Value "Unable to connect to the Lenovo_BiosPasswordSettings WMI class" -Severity 3
-	throw "Unable to connect to the Lenovo_BiosPasswordSettings WMI class"
-}
-if(!($Error))
-{
-	Write-LogEntry -Value "Successfully connected to the Lenovo_BiosPasswordSettings WMI class" -Severity 1
-}
+$PasswordSettings = Get-WmiData -Namespace root\wmi -ClassName Lenovo_BiosPasswordSettings -CmdletType WMI
 
 #Connect to the Lenovo_SetBiosPassword WMI class
-$Error.Clear()
-try
-{
-	Write-LogEntry -Value "Connect to the Lenovo_SetBiosPassword WMI class" -Severity 1
-	$PasswordSet = Get-WmiObject -Namespace root\wmi -Class Lenovo_SetBiosPassword
-}
-catch
-{
-	Write-LogEntry -Value "Unable to connect to the Lenovo_SetBiosPassword WMI class" -Severity 3
-	throw "Unable to connect to the Lenovo_BiosPasswordSettings WMI class"
-}
-if(!($Error))
-{
-	Write-LogEntry -Value "Successfully connected to the Lenovo_SetBiosPassword WMI class" -Severity 1
-}
+$PasswordSet = Get-WmiData -Namespace root\wmi -ClassName Lenovo_SetBiosPassword -CmdletType WMI
 
 #Parameter validation
 Write-LogEntry -Value "Begin parameter validation" -Severity 1
-
 if($GetSettings -and $SetSettings)
 {
-	$ErrorMsg = "Cannot specify the GetSettings and SetSettings parameters at the same time"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
+    Stop-Script -ErrorMessage "Cannot specify the GetSettings and SetSettings parameters at the same time"
 }
 if(!($GetSettings -or $SetSettings))
 {
-	$ErrorMsg = "One of the GetSettings or SetSettings parameters must be specified when running this script"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
+    Stop-Script -ErrorMessage "One of the GetSettings or SetSettings parameters must be specified when running this script"
 }
 if($SetSettings -and !($Settings -or $CsvPath))
 {
-	$ErrorMsg = "Settings must be specified using either the Settings variable in the script or the CsvPath parameter"
-	Write-LogEntry -Value $ErrorMsg -Severity 3
-	throw $ErrorMsg
+    Stop-Script -ErrorMessage "Settings must be specified using either the Settings variable in the script or the CsvPath parameter"
 }
-
 Write-LogEntry -Value "Parameter validation completed" -Severity 1
 
 #Set counters to 0
@@ -368,19 +393,40 @@ if($SetSettings)
     $NotFound = 0
 }
 
-#Get the current password status
+#Get the current password state
+Write-LogEntry -Value "Get the current password state" -Severity 1
+switch($PasswordSettings.PasswordState)
+{
+	{$_ -eq 0}
+	{
+		Write-LogEntry -Value "No passwords are currently set" -Severity 1
+	}
+	{($_ -eq 2) -or ($_ -eq 3) -or ($_ -eq 6) -or ($_ -eq 7) -or ($_ -eq 66) -or ($_ -eq 67) -or ($_ -eq 70) -or ($_-eq 71)}
+	{
+		$SvpSet = $true
+		Write-LogEntry -Value "The supervisor password is set" -Severity 1
+	}
+	{($_ -eq 64) -or ($_ -eq 65) -or ($_ -eq 66) -or ($_ -eq 67) -or ($_ -eq 68) -or ($_ -eq 69) -or ($_ -eq 70) -or ($_-eq 71)}
+	{
+		$SmpSet = $true
+		Write-LogEntry -Value "The system management password is set" -Severity 1
+	}
+	default
+	{
+		Stop-Script -ErrorMessage "Unable to determine the current password state from value: $($PasswordSettings.PasswordState)"
+	}
+}
+
+#Ensure passwords are set correctly
 if($SetSettings)
 {
-    Write-LogEntry -Value "Check current BIOS supervisor password status" -Severity 1
-    $PasswordCheck = $PasswordSettings.PasswordState
-
-    if(($PasswordCheck -eq 2) -or ($PasswordCheck -eq 3) -or($PasswordCheck -eq 6) -or($PasswordCheck -eq 7))
+    if($SvpSet)
     {
+        Write-LogEntry -Value "Ensure the supplied supervisor password is correct" -Severity 1
         #Supervisor password set but parameter not specified
         if([String]::IsNullOrEmpty($SupervisorPassword))
         {
-            Write-LogEntry -Value "The BIOS supervisor password is set, but no password was supplied. Use the SupervisorPassword parameter when a password is set" -Severity 3
-            throw "The BIOS supervisor password is set, but no password was supplied. Use the SupervisorPassword parameter when a password is set"
+            Stop-Script -ErrorMessage "The supervisor password is set, but no password was supplied. Use the SupervisorPassword parameter when a password is set"
         }
         #Supervisor password set correctly
         if($PasswordSet.SetBiosPassword("pap,$SupervisorPassword,$SupervisorPassword,ascii,us").Return -eq "Success")
@@ -390,27 +436,37 @@ if($SetSettings)
         #Supervisor password not set correctly
         else
         {
-            Write-LogEntry -Value "The specified supervisor password does not match the currently set password" -Severity 3
-            $ReturnCode = $PasswordSet.SetBiosPassword("pap,$SupervisorPassword,$SupervisorPassword,ascii,us").Return
-            Write-Output $ReturnCode
-            throw "The specified supervisor password does not match the currently set password"
+            Stop-Script -ErrorMessage "The specified supervisor password does not match the currently set password"
         }
     }
-    else
+    elseif($SmpSet -and !$SvpSet)
     {
-        Write-LogEntry -Value "The BIOS supervisor password is not currently set" -Severity 1
+        Write-LogEntry -Value "Ensure the supplied system management password is correct" -Severity 1
+        #System management password set but parameter not specified
+        if([String]::IsNullOrEmpty($SystemManagementPassword))
+        {
+            Stop-Script -ErrorMessage "The system management password is set, but no password was supplied. Use the SystemManagementPassword parameter when a password is set"
+        }
+        #System management password set correctly
+        if($PasswordSet.SetBiosPassword("smp,$SystemManagementPassword,$SystemManagementPassword,ascii,us").Return -eq "Success")
+	    {
+		    Write-LogEntry -Value "The specified system management password matches the currently set password" -Severity 1
+        }
+        #System management password not set correctly
+        else
+        {
+            Stop-Script -ErrorMessage "The specified system management password does not match the currently set password"
+        }
     }
 }
 
-#Get the current settings
+#Get settings
 if($GetSettings)
 {
     $SettingList = $SettingList | Select-Object CurrentSetting | Sort-Object CurrentSetting
-
     $SettingObject = ForEach($Setting in $SettingList){
         #Split the current values
         $SettingSplit = ($Setting.CurrentSetting).Split(',')
-
         if($SettingSplit[0] -and $SettingSplit[1])
         {
             [PSCustomObject]@{
@@ -419,7 +475,6 @@ if($GetSettings)
             }
         }
     }
-
     if($CsvPath)
     {
         $SettingObject | Export-Csv -Path $CsvPath -NoTypeInformation
@@ -430,7 +485,7 @@ if($GetSettings)
         Write-Output $SettingObject    
     }
 }
-
+#Set Settings
 if($SetSettings)
 {
     if($CsvPath)
@@ -438,9 +493,8 @@ if($SetSettings)
         Clear-Variable Settings -ErrorAction SilentlyContinue
         $Settings = Import-Csv -Path $CsvPath
     }
-
     #Set Lenovo BIOS settings - supervisor password is set
-    if(($PasswordCheck -eq 2) -or ($PasswordCheck -eq 3) -or($PasswordCheck -eq 6) -or($PasswordCheck -eq 7))
+    if($SvpSet)
     {
         if($CsvPath)
         {
@@ -456,8 +510,24 @@ if($SetSettings)
             }
         }
     }
-
-    #Set Lenovo BIOS settings - supervisor password is not set
+    #Set Lenovo BIOS settings - system management password is set
+    elseif($SmpSet -and !$SvpSet)
+    {
+        if($CsvPath)
+        {
+            ForEach($Setting in $Settings){
+                Set-LenovoBiosSetting -Name $Setting.Name -Value $Setting.Value -Password $SystemManagementPassword
+            }
+        }
+        else
+        {
+            ForEach($Setting in $Settings){
+                $Data = $Setting.Split(',')
+                Set-LenovoBiosSetting -Name $Data[0] -Value $Data[1].Trim() -Password $SystemManagementPassword
+            }
+        }
+    }
+    #Set Lenovo BIOS settings - password is not set
     else
     {
         if($CsvPath)
@@ -476,11 +546,30 @@ if($SetSettings)
     }
 }
 
-
 #If settings were set, save the changes
 if($SetSettings -and $SuccessSet -gt 0)
 {
-    $SaveSettings.SaveBiosSettings() | Out-Null
+    Write-LogEntry -Value "Save the BIOS settings changes" -Severity 1
+    if($SvpSet)
+    {
+        $ReturnCode = ($SaveSettings.SaveBiosSettings("$SupervisorPassword,ascii,us")).Value
+    }
+    elseif($SmpSet -and !$SvpSet)
+    {
+        $ReturnCode = ($SaveSettings.SaveBiosSettings("$SystemManagementPassword,ascii,us")).Value
+    }
+    else
+    {
+        $ReturnCode = ($SaveSettings.SaveBiosSettings()).Value
+    }
+    if(($null -eq $ReturnCode) -or ($ReturnCode -eq "Success"))
+    {
+        Write-LogEntry -Value "Successfully saved the BIOS settings" -Severity 1
+    }
+    else
+    {
+        Stop-Script -ErrorMessage "Failed to save the BIOS settings. Return Code: $ReturnCode"
+    }
 }
 
 #Display results
