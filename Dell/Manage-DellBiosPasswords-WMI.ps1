@@ -54,10 +54,11 @@
 	.NOTES
 		Created by: Jon Anderson (@ConfigJon)
 		Reference: https://www.configjon.com/dell-bios-password-management-wmi/
-		Modified: 2020-09-14
+		Modified: 2020-09-17
 
 	.CHANGELOG
 		2020-09-14 - When using the AdminSet and SystemSet parameters, the OldPassword parameters are no longer required. There is now logic to handle and report this type of failure.
+		2020-09-17 - Improved the log file path configuration
 
 #>
 
@@ -427,15 +428,22 @@ if(Get-TaskSequenceStatus)
 else
 {
 	$LogsDirectory = ($LogFile | Split-Path)
-	if(!(Test-Path -PathType Container $LogsDirectory))
+	if([string]::IsNullOrEmpty($LogsDirectory))
 	{
-		try
+		$LogsDirectory = $PSScriptRoot
+	}
+	else
+	{
+		if(!(Test-Path -PathType Container $LogsDirectory))
 		{
-			New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
-		}
-		catch
-		{
-			throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+			try
+			{
+				New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
+			}
+			catch
+			{
+				throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+			}
 		}
 	}
 }

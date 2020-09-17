@@ -60,7 +60,10 @@
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
         Reference: https://www.configjon.com/dell-bios-settings-management-wmi/
-        Modified: 2020-09-11
+        Modified: 2020-09-17
+
+    .CHANGELOG
+        2020-09-17 - Improved the log file path configuration
         
 #>
 
@@ -394,15 +397,22 @@ if(Get-TaskSequenceStatus)
 else
 {
 	$LogsDirectory = ($LogFile | Split-Path)
-	if(!(Test-Path -PathType Container $LogsDirectory))
+	if([string]::IsNullOrEmpty($LogsDirectory))
 	{
-		try
+		$LogsDirectory = $PSScriptRoot
+	}
+	else
+	{
+		if(!(Test-Path -PathType Container $LogsDirectory))
 		{
-			New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
-		}
-		catch
-		{
-			throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+			try
+			{
+				New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
+			}
+			catch
+			{
+				throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+			}
 		}
 	}
 }
