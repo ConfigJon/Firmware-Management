@@ -54,7 +54,7 @@
                      Updated formatting
         2020-09-16 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Lenovo.
                      Consolidated duplicate code into new functions (Stop-Script, Get-WmiData). Made a number of minor formatting and syntax changes
-                     Updated the save BIOS settings section with better logic to work when a password is set. Credit to CharlesNRU for pointing out this fix.
+                     Updated the save BIOS settings section with better logic to work when a password is set.
                      Added support for for using the system management password
 
 #>
@@ -196,17 +196,17 @@ Function Get-WmiData
     }
     catch
     {
-		if($Select)
-		{
-			Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message
-		}
-		else
-		{
-			Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message	
-		}
-	}
-	Write-LogEntry -Value "Successfully connected to the $ClassName WMI class" -Severity 1
-	return $Query
+        if($Select)
+        {
+            Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message
+        }
+        else
+        {
+            Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message	
+        }
+    }
+    Write-LogEntry -Value "Successfully connected to the $ClassName WMI class" -Severity 1
+    return $Query
 }
 
 Function Set-LenovoBiosSetting
@@ -338,17 +338,17 @@ else
     else
     {
         if(!(Test-Path -PathType Container $LogsDirectory))
-	    {
-		    try
-		    {
-			    New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
-		    }
-		    catch
-		    {
-			    throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+        {
+            try
+            {
+                New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
+            }
+            catch
+            {
+                throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
             }
         }
-	}
+    }
 }
 Write-Output "Log path set to $LogFile"
 Write-LogEntry -Value "START - Lenovo BIOS settings management script" -Severity 1

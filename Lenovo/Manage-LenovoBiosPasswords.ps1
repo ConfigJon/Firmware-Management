@@ -56,8 +56,8 @@
 	.PARAMETER SMSTSPasswordRetry
 		For use in a task sequence. If specified, the script will assume the script needs to run at least one more time. This will ignore password errors and suppress user prompts.
 
-    .PARAMETER LogFile
-        Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
+	.PARAMETER LogFile
+		Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
 	.EXAMPLE	
 		Change an existing supervisor password
@@ -123,8 +123,8 @@ param(
             throw "The file specified in the LogFile paramter must be a .log file"
         }
         return $true
-    })]
-    [System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\Lenovo\Manage-LenovoBiosPasswords.log"
+	})]
+	[System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\Lenovo\Manage-LenovoBiosPasswords.log"
 )
 
 #Functions ====================================================================================================================
@@ -179,43 +179,43 @@ Function Get-WmiData
 {
 	#Gets WMI data using either the WMI or CIM cmdlets and stores the data in a variable
 
-    param(
-        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
-        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ClassName,
-        [Parameter(Mandatory=$true)][ValidateSet('CIM','WMI')]$CmdletType,
-        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
-    )
-    try
-    {
-        if($CmdletType -eq "CIM")
-        {
-            if($Select)
-            {
+	param(
+		[Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
+		[Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ClassName,
+		[Parameter(Mandatory=$true)][ValidateSet('CIM','WMI')]$CmdletType,
+		[Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
+	)
+	try
+	{
+		if($CmdletType -eq "CIM")
+		{
+			if($Select)
+			{
 				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop | Select-Object $Select -ErrorAction Stop
-            }
-            else
-            {
+				$Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop | Select-Object $Select -ErrorAction Stop
+			}
+			else
+			{
 				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop
-            }
-        }
-        elseif($CmdletType -eq "WMI")
-        {
-            if($Select)
-            {
+				$Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop
+			}
+		}
+		elseif($CmdletType -eq "WMI")
+		{
+			if($Select)
+			{
 				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-                $Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction Stop | Select-Object $Select -ErrorAction Stop
-            }
-            else
-            {
+				$Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction Stop | Select-Object $Select -ErrorAction Stop
+			}
+			else
+			{
 				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-                $Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction Stop
-            }
-        }
-    }
-    catch
-    {
+				$Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction Stop
+			}
+		}
+	}
+	catch
+	{
 		if($Select)
 		{
 			Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message
@@ -379,12 +379,12 @@ Function Start-UserPrompt
 {
 	#Create a user prompt with custom body and title text if the NoUserPrompt variable is not set
 
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory=$True)][ValidateNotNullOrEmpty()][String[]]$BodyText,
-        [Parameter(Mandatory=$True)][ValidateNotNullOrEmpty()][String[]]$TitleText
-    )
-    if(!($NoUserPrompt))
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory=$True)][ValidateNotNullOrEmpty()][String[]]$BodyText,
+		[Parameter(Mandatory=$True)][ValidateNotNullOrEmpty()][String[]]$TitleText
+	)
+	if(!($NoUserPrompt))
 	{
 		(New-Object -ComObject Wscript.Shell).Popup("$BodyText",0,"$TitleText",0x0 + 0x30) | Out-Null
 	}
@@ -451,12 +451,12 @@ if(Get-TaskSequenceStatus)
 else
 {
 	$LogsDirectory = ($LogFile | Split-Path)
-    if([string]::IsNullOrEmpty($LogsDirectory))
-    {
-        $LogsDirectory = $PSScriptRoot
-    }
-    else
-    {
+	if([string]::IsNullOrEmpty($LogsDirectory))
+	{
+		$LogsDirectory = $PSScriptRoot
+	}
+	else
+	{
 		if(!(Test-Path -PathType Container $LogsDirectory))
 		{
 			try
@@ -678,17 +678,17 @@ if(!$PopSet)
 #No system management password set
 if(!$SmpSet)
 {
-    if($SystemManagementSet)
-    {
+	if($SystemManagementSet)
+	{
 		$SystemManagementPWExists = "Failed"
 		Write-LogEntry -Value "No system management password currently set. Unable to set the system management password" -Severity 3
 		#New-LenovoBiosPassword -PasswordType SystemManagement -Password $SystemManagementPassword
 	}
-    if($SystemManagementClear)
-    {
-        Write-LogEntry -Value "No system management password currently set. No need to clear the system management password" -Severity 2
-        Clear-Variable SystemManagementClear
-    }
+	if($SystemManagementClear)
+	{
+		Write-LogEntry -Value "No system management password currently set. No need to clear the system management password" -Severity 2
+		Clear-Variable SystemManagementClear
+	}
 }
 
 #If a supervisor password is set, attempt to clear or change it
