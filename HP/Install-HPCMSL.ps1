@@ -18,11 +18,12 @@
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
         Reference: https://www.configjon.com/installing-the-hp-client-management-script-library\
-        Modified: 2020-09-14
+        Modified: 2020-09-17
 
     .CHANGELOG
         2020-09-14 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\HP.
                      Created a new function (Stop-Script) to consolidate some duplicate code and improve error reporting. Made a number of minor formatting and syntax changes
+        2020-09-17 - Improved the log file path configuration
 #>
 
 #Parameters ===================================================================================================================
@@ -322,15 +323,22 @@ if(Get-TaskSequenceStatus)
 else
 {
 	$LogsDirectory = ($LogFile | Split-Path)
-	if(!(Test-Path -PathType Container $LogsDirectory))
+	if([string]::IsNullOrEmpty($LogsDirectory))
 	{
-		try
+		$LogsDirectory = $PSScriptRoot
+	}
+	else
+	{
+		if(!(Test-Path -PathType Container $LogsDirectory))
 		{
-			New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
-		}
-		catch
-		{
-			throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+			try
+			{
+				New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
+			}
+			catch
+			{
+				throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+			}
 		}
 	}
 }
