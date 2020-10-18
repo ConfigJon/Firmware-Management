@@ -16,6 +16,9 @@
 
     .PARAMETER SystemManagementPassword
         The current system management password
+    
+    .PARAMETER SetDefaults
+        Instructs the script to set all BIOS settings to default values
 
     .PARAMETER LogFile
         Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
@@ -39,10 +42,13 @@
         #Output a list of current BIOS settings to a CSV file
         Manage-LenovoBiosSettings.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
 
+        #Set all BIOS settings to factory default values when the supervisor password is set
+        Manage-LenovoBiosSettings.ps1 -SetDefaults -SupervisorPassword ExamplePassword
+
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
         Reference: https://www.configjon.com/lenovo-bios-settings-management/
-        Modified: 2020-09-16
+        Modified: 2020-10-18
 
     .CHANGELOG
         2019-11-04 - Added additional logging. Changed the default log path to $ENV:ProgramData\BiosScripts\Lenovo.
@@ -56,6 +62,7 @@
                      Consolidated duplicate code into new functions (Stop-Script, Get-WmiData). Made a number of minor formatting and syntax changes
                      Updated the save BIOS settings section with better logic to work when a password is set.
                      Added support for for using the system management password
+        2020-10-18 - Added the SetDefaults parameter. This allows for setting all BIOS settings to default values.
 
 #>
 
@@ -63,7 +70,8 @@
 
 param(
     [Parameter(Mandatory=$false)][Switch]$GetSettings,
-    [Parameter(Mandatory=$false)][Switch]$SetSettings,    
+    [Parameter(Mandatory=$false)][Switch]$SetSettings,
+    [Parameter(Mandatory=$false)][Switch]$SetDefaults,
     [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$SupervisorPassword,
     [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$SystemManagementPassword,
     [ValidateScript({
@@ -214,60 +222,83 @@ Function Set-LenovoBiosSetting
     #Set a specific Lenovo BIOS setting
 
     param(
-        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Name,
-        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Value,
-        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Password
+        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Name,
+        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Value,
+        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Password,
+        [Parameter(Mandatory=$false)][Switch]$Defaults
     )
-    #Ensure the specified setting exists and get the possible values
-    $CurrentSetting = $SettingList | Where-Object CurrentSetting -Like "$Name*" | Select-Object -ExpandProperty CurrentSetting
-    if($NULL -ne $CurrentSetting)
+    if($Defaults)
     {
-        #Check how the CurrentSetting data is formatted, then split the setting and current value
-        if($CurrentSetting -match ';')
+        if(!([String]::IsNullOrEmpty($Password)))
         {
-            $FormattedSetting = $CurrentSetting.Substring(0, $CurrentSetting.IndexOf(';'))
-            $CurrentSettingSplit = $FormattedSetting.Split(',')
+            $SettingResult = ($DefaultSettings.LoadDefaultSettings("$Password,ascii,us")).Return
         }
         else
         {
-            $CurrentSettingSplit = $CurrentSetting.Split(',')
+            $SettingResult = ($DefaultSettings.LoadDefaultSettings()).Return
         }
-        #Setting is already set to specified value
-        if($CurrentSettingSplit[1] -eq $Value)
+        if($SettingResult -eq "Success")
         {
-            Write-LogEntry -Value "Setting ""$Name"" is already set to ""$Value""" -Severity 1
-            $Script:AlreadySet++
+            Write-LogEntry -Value "Successfully loaded default BIOS settings" -Severity 1
+            $Script:DefaultSet = $True
         }
-        #Setting is not set to specified value
         else
         {
-            if(!([String]::IsNullOrEmpty($Password)))
-            {
-                $SettingResult = ($Interface.SetBIOSSetting("$Name,$Value,$Password,ascii,us")).Return
-            }
-            else
-            {
-                $SettingResult = ($Interface.SetBIOSSetting("$Name,$Value")).Return
-            }
-            
-
-            if($SettingResult -eq "Success")
-            {
-                Write-LogEntry -Value "Successfully set ""$Name"" to ""$Value""" -Severity 1
-                $Script:SuccessSet++
-            }
-            else
-            {
-                Write-LogEntry -Value "Failed to set ""$Name"" to ""$Value"". Return code: $SettingResult" -Severity 3
-                $Script:FailSet++
-            }
+            Write-LogEntry -Value "Failed to load default BIOS settings. Return code: $SettingResult" -Severity 3
+            $Script:DefaultSet = $False
         }
     }
-    #Setting not found
     else
     {
-        Write-LogEntry -Value "Setting ""$Name"" not found" -Severity 2
-        $Script:NotFound++
+        #Ensure the specified setting exists and get the possible values
+        $CurrentSetting = $SettingList | Where-Object CurrentSetting -Like "$Name*" | Select-Object -ExpandProperty CurrentSetting
+        if($NULL -ne $CurrentSetting)
+        {
+            #Check how the CurrentSetting data is formatted, then split the setting and current value
+            if($CurrentSetting -match ';')
+            {
+                $FormattedSetting = $CurrentSetting.Substring(0, $CurrentSetting.IndexOf(';'))
+                $CurrentSettingSplit = $FormattedSetting.Split(',')
+            }
+            else
+            {
+                $CurrentSettingSplit = $CurrentSetting.Split(',')
+            }
+            #Setting is already set to specified value
+            if($CurrentSettingSplit[1] -eq $Value)
+            {
+                Write-LogEntry -Value "Setting ""$Name"" is already set to ""$Value""" -Severity 1
+                $Script:AlreadySet++
+            }
+            #Setting is not set to specified value
+            else
+            {
+                if(!([String]::IsNullOrEmpty($Password)))
+                {
+                    $SettingResult = ($Interface.SetBIOSSetting("$Name,$Value,$Password,ascii,us")).Return
+                }
+                else
+                {
+                    $SettingResult = ($Interface.SetBIOSSetting("$Name,$Value")).Return
+                }
+                if($SettingResult -eq "Success")
+                {
+                    Write-LogEntry -Value "Successfully set ""$Name"" to ""$Value""" -Severity 1
+                    $Script:SuccessSet++
+                }
+                else
+                {
+                    Write-LogEntry -Value "Failed to set ""$Name"" to ""$Value"". Return code: $SettingResult" -Severity 3
+                    $Script:FailSet++
+                }
+            }
+        }
+        #Setting not found
+        else
+        {
+            Write-LogEntry -Value "Setting ""$Name"" not found" -Severity 2
+            $Script:NotFound++
+        }
     }
 }
 
@@ -353,6 +384,32 @@ else
 Write-Output "Log path set to $LogFile"
 Write-LogEntry -Value "START - Lenovo BIOS settings management script" -Severity 1
 
+#Parameter validation
+Write-LogEntry -Value "Begin parameter validation" -Severity 1
+if($GetSettings -and ($SetSettings -or $SetDefaults))
+{
+    Stop-Script -ErrorMessage "Cannot specify the GetSettings and SetSettings or SetDefaults parameters at the same time"
+}
+if(!($GetSettings -or $SetSettings -or $SetDefaults))
+{
+    Stop-Script -ErrorMessage "One of the GetSettings or SetSettings or SetDefaults parameters must be specified when running this script"
+}
+if($SetSettings -and !($Settings -or $CsvPath))
+{
+    Stop-Script -ErrorMessage "Settings must be specified using either the Settings variable in the script or the CsvPath parameter"
+}
+if($SetSettings -and $SetDefaults)
+{
+	$ErrorMsg = "Both the SetSettings and SetDefaults parameters have been used. The SetDefaults parameter will override any other settings"
+    Write-LogEntry -Value $ErrorMsg -Severity 2
+}
+if(($SetDefaults -and $CsvPath) -and !($SetSettings))
+{
+	$ErrorMsg = "The CsvPath parameter has been specified without the SetSettings paramter. The CSV file will be ignored"
+    Write-LogEntry -Value $ErrorMsg -Severity 2
+}
+Write-LogEntry -Value "Parameter validation completed" -Severity 1
+
 #Connect to the Lenovo_BiosSetting WMI class
 $SettingList = Get-WmiData -Namespace root\wmi -ClassName Lenovo_BiosSetting -CmdletType WMI
 
@@ -368,29 +425,20 @@ $PasswordSettings = Get-WmiData -Namespace root\wmi -ClassName Lenovo_BiosPasswo
 #Connect to the Lenovo_SetBiosPassword WMI class
 $PasswordSet = Get-WmiData -Namespace root\wmi -ClassName Lenovo_SetBiosPassword -CmdletType WMI
 
-#Parameter validation
-Write-LogEntry -Value "Begin parameter validation" -Severity 1
-if($GetSettings -and $SetSettings)
+#Connect to the Lenovo_SetBiosPassword WMI class
+if($SetDefaults)
 {
-    Stop-Script -ErrorMessage "Cannot specify the GetSettings and SetSettings parameters at the same time"
+    $DefaultSettings = Get-WmiData -Namespace root\wmi -ClassName Lenovo_LoadDefaultSettings -CmdletType WMI
 }
-if(!($GetSettings -or $SetSettings))
-{
-    Stop-Script -ErrorMessage "One of the GetSettings or SetSettings parameters must be specified when running this script"
-}
-if($SetSettings -and !($Settings -or $CsvPath))
-{
-    Stop-Script -ErrorMessage "Settings must be specified using either the Settings variable in the script or the CsvPath parameter"
-}
-Write-LogEntry -Value "Parameter validation completed" -Severity 1
 
 #Set counters to 0
-if($SetSettings)
+if($SetSettings -or $SetDefaults)
 {
     $AlreadySet = 0
     $SuccessSet = 0
     $FailSet = 0
     $NotFound = 0
+    $DefaultSet = $Null
 }
 
 #Get the current password state
@@ -418,7 +466,7 @@ switch($PasswordSettings.PasswordState)
 }
 
 #Ensure passwords are set correctly
-if($SetSettings)
+if($SetSettings -or $SetDefaults)
 {
     if($SvpSet)
     {
@@ -486,7 +534,7 @@ if($GetSettings)
     }
 }
 #Set Settings
-if($SetSettings)
+if($SetSettings -or $SetDefaults)
 {
     if($CsvPath)
     {
@@ -496,58 +544,79 @@ if($SetSettings)
     #Set Lenovo BIOS settings - supervisor password is set
     if($SvpSet)
     {
-        if($CsvPath)
+        if($SetSettings)
         {
-            ForEach($Setting in $Settings){
-                Set-LenovoBiosSetting -Name $Setting.Name -Value $Setting.Value -Password $SupervisorPassword
+            if($CsvPath)
+            {
+                ForEach($Setting in $Settings){
+                    Set-LenovoBiosSetting -Name $Setting.Name -Value $Setting.Value -Password $SupervisorPassword
+                }
+            }
+            else
+            {
+                ForEach($Setting in $Settings){
+                    $Data = $Setting.Split(',')
+                    Set-LenovoBiosSetting -Name $Data[0] -Value $Data[1].Trim() -Password $SupervisorPassword
+                }
             }
         }
-        else
+        if($SetDefaults)
         {
-            ForEach($Setting in $Settings){
-                $Data = $Setting.Split(',')
-                Set-LenovoBiosSetting -Name $Data[0] -Value $Data[1].Trim() -Password $SupervisorPassword
-            }
+            Set-LenovoBiosSetting -Defaults -Password $SupervisorPassword
         }
     }
     #Set Lenovo BIOS settings - system management password is set
     elseif($SmpSet -and !$SvpSet)
     {
-        if($CsvPath)
+        if($SetSettings)
         {
-            ForEach($Setting in $Settings){
-                Set-LenovoBiosSetting -Name $Setting.Name -Value $Setting.Value -Password $SystemManagementPassword
+            if($CsvPath)
+            {
+                ForEach($Setting in $Settings){
+                    Set-LenovoBiosSetting -Name $Setting.Name -Value $Setting.Value -Password $SystemManagementPassword
+                }
+            }
+            else
+            {
+                ForEach($Setting in $Settings){
+                    $Data = $Setting.Split(',')
+                    Set-LenovoBiosSetting -Name $Data[0] -Value $Data[1].Trim() -Password $SystemManagementPassword
+                }
             }
         }
-        else
+        if($SetDefaults)
         {
-            ForEach($Setting in $Settings){
-                $Data = $Setting.Split(',')
-                Set-LenovoBiosSetting -Name $Data[0] -Value $Data[1].Trim() -Password $SystemManagementPassword
-            }
+            Set-LenovoBiosSetting -Defaults -Password $SystemManagementPassword
         }
     }
     #Set Lenovo BIOS settings - password is not set
     else
     {
-        if($CsvPath)
+        if($SetSettings)
         {
-            ForEach($Setting in $Settings){
-                Set-LenovoBiosSetting -Name $Setting.Name -Value $Setting.Value
+            if($CsvPath)
+            {
+                ForEach($Setting in $Settings){
+                    Set-LenovoBiosSetting -Name $Setting.Name -Value $Setting.Value
+                }
+            }
+            else
+            {
+                ForEach($Setting in $Settings){
+                    $Data = $Setting.Split(',')
+                    Set-LenovoBiosSetting -Name $Data[0] -Value $Data[1].Trim()
+                }
             }
         }
-        else
+        if($SetDefaults)
         {
-            ForEach($Setting in $Settings){
-                $Data = $Setting.Split(',')
-                Set-LenovoBiosSetting -Name $Data[0] -Value $Data[1].Trim()
-            }
+            Set-LenovoBiosSetting -Defaults
         }
     }
 }
 
 #If settings were set, save the changes
-if($SetSettings -and $SuccessSet -gt 0)
+if(($SuccessSet -gt 0) -or ($DefaultSet -eq $True))
 {
     Write-LogEntry -Value "Save the BIOS settings changes" -Severity 1
     if($SvpSet)
@@ -583,6 +652,17 @@ if($SetSettings)
     Write-LogEntry -Value "$FailSet settings failed to set" -Severity 3
     Write-Output "$NotFound settings not found"
     Write-LogEntry -Value "$NotFound settings not found" -Severity 2
+}
+if($SetDefaults)
+{
+    if($DefaultSet -eq $True)
+    {
+        Write-Output "Successfully loaded default BIOS settings"
+    }
+    else
+    {
+        Write-Output "Failed to load default BIOS settings"
+    }
 }
 Write-Output "Lenovo BIOS settings Management completed. Check the log file for more information"
 Write-LogEntry -Value "END - Lenovo BIOS settings management script" -Severity 1
