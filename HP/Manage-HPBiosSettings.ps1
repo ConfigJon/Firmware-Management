@@ -420,7 +420,7 @@ if($SetSettings)
 #Get the current settings
 if($GetSettings)
 {
-    $SettingList = $SettingList | Select-Object Name,Value | Sort-Object Name
+    $SettingList = $SettingList | Where-Object{$_.Name -ne " "} | Select-Object Name,Value | Sort-Object Name
     $SettingObject = ForEach($Setting in $SettingList){
         #Split the current values
         $SettingSplit = ($Setting.Value).Split(',')
@@ -428,9 +428,9 @@ if($GetSettings)
         $SplitCount = 0
         while($SplitCount -lt $SettingSplit.Count)
         {
-            if($SettingSplit[$SplitCount].StartsWith('*'))
+            if($SettingSplit[$SplitCount].Trim().StartsWith('*'))
             {
-                $SetValue = ($SettingSplit[$SplitCount]).Substring(1)
+                $SetValue = ($SettingSplit[$SplitCount]).Trim().Substring(1)
                 break
             }
             else
