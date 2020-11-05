@@ -220,7 +220,7 @@ Function Set-HPBiosSetting
     if($NULL -ne $CurrentSetting)
     {
         #Split the current values
-        $CurrentSettingSplit = $CurrentSetting.Split(',')
+        $CurrentSettingSplit = $CurrentSetting.Split(',') | ForEach-Object{$_.Trim()}
         #Find the currently set value
         $Count = 0
         while($Count -lt $CurrentSettingSplit.Count)
@@ -420,10 +420,10 @@ if($SetSettings)
 #Get the current settings
 if($GetSettings)
 {
-    $SettingList = $SettingList | Select-Object Name,Value | Sort-Object Name
+    $SettingList = $SettingList | Where-Object{$_.Name -ne " "} | Select-Object Name,Value | Sort-Object Name
     $SettingObject = ForEach($Setting in $SettingList){
         #Split the current values
-        $SettingSplit = ($Setting.Value).Split(',')
+        $SettingSplit = ($Setting.Value).Split(',') | ForEach-Object{$_.Trim()}
         #Find the currently set value
         $SplitCount = 0
         while($SplitCount -lt $SettingSplit.Count)
