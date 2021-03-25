@@ -1,6 +1,6 @@
 <#
     .DESCRIPTION
-        Import the Dell Command | PowerShell Provider module
+        Import the Dell Command | PowerShell Provider module (Version 2.4 and later)
     
     .PARAMETER ModulePath
         Specify the location of the DellBIOSProvider module source files. This parameter should be specified when the script is running in WinPE or when the system does not have internet access
@@ -21,12 +21,13 @@
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
         Reference: https://www.configjon.com/working-with-the-dell-command-powershell-provider/
-        Modified: 2020-09-17
+        Modified: 2020-03-24
 
 	.CHANGELOG
         2020-09-07 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Dell.
                      Created a new function (Stop-Script) to consolidate some duplicate code and improve error reporting. Made a number of minor formatting and syntax changes
         2020-09-17 - Improved the log file path configuration
+		2021-03-24 - Updated the required .dll files to support version 2.4 of the DellBIOSProvider module
 
 #>
 
@@ -463,13 +464,13 @@ $BiosVerMajor = Get-WmiObject -Class Win32_Bios | Select-Object -ExpandProperty 
 $BiosVerMinor = Get-WmiObject -Class Win32_Bios | Select-Object -ExpandProperty SMBIOSMinorVersion
 $BiosVerFull = "$($BiosVerMajor)." + "$($BiosVerMinor)"
 
-if($BiosVerFull -ge 2.3)
+if($BiosVerFull -ge 2.4)
 {
     Write-LogEntry -Value "The current SMBIOS version is $BiosVerFull" -Severity 1
 }
 else
 {
-    Stop-Script -ErrorMessage "The current SMBIOS version is $BiosVerFull. The mininum supported SMBIOS version is 2.3"
+    Stop-Script -ErrorMessage "The current SMBIOS version is $BiosVerFull. The mininum supported SMBIOS version is 2.4"
 }
 
 #Verify the required .dll files exist
@@ -477,19 +478,15 @@ Write-LogEntry -Value "Verify Visual C++ DLL files exist" -Severity 1
 
 if($DllPath)
 {
-    Copy-Dll -DllSourcePath "$DllPath" -DllFile "msvcp100.dll" -DllTargetPath "$ENV:windir\System32"
-    Copy-Dll -DllSourcePath "$DllPath" -DllFile "msvcr100.dll" -DllTargetPath "$ENV:windir\System32"
     Copy-Dll -DllSourcePath "$DllPath" -DllFile "msvcp140.dll" -DllTargetPath "$ENV:windir\System32"
-    Copy-Dll -DllSourcePath "$DllPath" -DllFile "vccorlib140.dll" -DllTargetPath "$ENV:windir\System32"
     Copy-Dll -DllSourcePath "$DllPath" -DllFile "vcruntime140.dll" -DllTargetPath "$ENV:windir\System32"
+    Copy-Dll -DllSourcePath "$DllPath" -DllFile "vcruntime140_1.dll" -DllTargetPath "$ENV:windir\System32"
 }
 else
 {
-    Copy-Dll -DllFile "msvcp100.dll" -DllTargetPath "$ENV:windir\System32"
-    Copy-Dll -DllFile "msvcr100.dll" -DllTargetPath "$ENV:windir\System32"
     Copy-Dll -DllFile "msvcp140.dll" -DllTargetPath "$ENV:windir\System32"
-    Copy-Dll -DllFile "vccorlib140.dll" -DllTargetPath "$ENV:windir\System32"
     Copy-Dll -DllFile "vcruntime140.dll" -DllTargetPath "$ENV:windir\System32"
+    Copy-Dll -DllFile "vcruntime140_1.dll" -DllTargetPath "$ENV:windir\System32"
 }
 if($DllFailure)
 {
