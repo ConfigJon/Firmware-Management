@@ -27,7 +27,7 @@
         2020-09-07 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Dell.
                      Created a new function (Stop-Script) to consolidate some duplicate code and improve error reporting. Made a number of minor formatting and syntax changes
         2020-09-17 - Improved the log file path configuration
-		2021-03-24 - Updated the required .dll files to support version 2.4 of the DellBIOSProvider module
+        2021-03-24 - Updated the required .dll files to support version 2.4 of the DellBIOSProvider module
 
 #>
 
