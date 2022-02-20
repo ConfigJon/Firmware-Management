@@ -1,7 +1,7 @@
 <#
     .DESCRIPTION
-        Import the Dell Command | PowerShell Provider module (Version 2.4 and later)
-    
+        Import the Dell Command | PowerShell Provider module (Version 2.6.0 and later)
+
     .PARAMETER ModulePath
         Specify the location of the DellBIOSProvider module source files. This parameter should be specified when the script is running in WinPE or when the system does not have internet access
 
@@ -12,7 +12,7 @@
         Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
     .EXAMPLE
-        Running in a full Windows OS and installing from the internet    
+        Running in a full Windows OS and installing from the internet
             Install-DellBiosProvider.ps1
 
         Running in WinPE
@@ -21,13 +21,13 @@
     .NOTES
         Created by: Jon Anderson (@ConfigJon)
         Reference: https://www.configjon.com/working-with-the-dell-command-powershell-provider/
-        Modified: 2020-03-24
+        Modified: 2022-02-20
 
 	.CHANGELOG
         2020-09-07 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Dell.
                      Created a new function (Stop-Script) to consolidate some duplicate code and improve error reporting. Made a number of minor formatting and syntax changes
         2020-09-17 - Improved the log file path configuration
-        2021-03-24 - Updated the required .dll files to support version 2.4 of the DellBIOSProvider module
+        2022-02-20 - Updated the required .dll files to support version 2.6.0 of the DellBIOSProvider module
 
 #>
 
@@ -478,12 +478,16 @@ Write-LogEntry -Value "Verify Visual C++ DLL files exist" -Severity 1
 
 if($DllPath)
 {
+    Copy-Dll -DllSourcePath "$DllPath" -DllFile "msvcp100.dll" -DllTargetPath "$ENV:windir\System32"
+    Copy-Dll -DllSourcePath "$DllPath" -DllFile "msvcr100.dll" -DllTargetPath "$ENV:windir\System32"
     Copy-Dll -DllSourcePath "$DllPath" -DllFile "msvcp140.dll" -DllTargetPath "$ENV:windir\System32"
     Copy-Dll -DllSourcePath "$DllPath" -DllFile "vcruntime140.dll" -DllTargetPath "$ENV:windir\System32"
     Copy-Dll -DllSourcePath "$DllPath" -DllFile "vcruntime140_1.dll" -DllTargetPath "$ENV:windir\System32"
 }
 else
 {
+    Copy-Dll -DllFile "msvcp100.dll" -DllTargetPath "$ENV:windir\System32"
+    Copy-Dll -DllFile "msvcr100.dll" -DllTargetPath "$ENV:windir\System32"
     Copy-Dll -DllFile "msvcp140.dll" -DllTargetPath "$ENV:windir\System32"
     Copy-Dll -DllFile "vcruntime140.dll" -DllTargetPath "$ENV:windir\System32"
     Copy-Dll -DllFile "vcruntime140_1.dll" -DllTargetPath "$ENV:windir\System32"
