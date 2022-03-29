@@ -225,7 +225,7 @@ Function Set-HPBiosSetting
         $Count = 0
         while($Count -lt $CurrentSettingSplit.Count)
         {
-            if($CurrentSettingSplit[$Count].StartsWith('*'))
+            if($CurrentSettingSplit[$Count].TrimStart().StartsWith('*'))
             {
                 $CurrentValue = $CurrentSettingSplit[$Count]
                 break
