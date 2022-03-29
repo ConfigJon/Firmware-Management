@@ -468,6 +468,9 @@ switch($PasswordSettings.PasswordState)
 #Ensure passwords are set correctly
 if($SetSettings -or $SetDefaults)
 {
+    #get settings from the machine
+    $SettingList = $SettingList | Select-Object CurrentSetting | where {$_.CurrentSetting -and ($_.CurrentSetting -NotLike "*ShowOnly*")} | Sort-Object CurrentSetting
+
     if($SvpSet)
     {
         Write-LogEntry -Value "Ensure the supplied supervisor password is correct" -Severity 1
@@ -476,8 +479,10 @@ if($SetSettings -or $SetDefaults)
         {
             Stop-Script -ErrorMessage "The supervisor password is set, but no password was supplied. Use the SupervisorPassword parameter when a password is set"
         }
+        #create test string for the password call 
+        $testValue = $SettingList[-1].CurrentSetting + "," + $SupervisorPassword + ",ascii,us"
         #Supervisor password set correctly
-        if($PasswordSet.SetBiosPassword("pap,$SupervisorPassword,$SupervisorPassword,ascii,us").Return -eq "Success")
+        if(($Interface.SetBiosSetting($testValue)).Return -eq "Success")
 	    {
 		    Write-LogEntry -Value "The specified supervisor password matches the currently set password" -Severity 1
         }
@@ -495,8 +500,10 @@ if($SetSettings -or $SetDefaults)
         {
             Stop-Script -ErrorMessage "The system management password is set, but no password was supplied. Use the SystemManagementPassword parameter when a password is set"
         }
+        #create test string for the password call 
+        $testValue = $SettingList[-1].CurrentSetting + "," + $SystemManagementPassword + ",ascii,us"
         #System management password set correctly
-        if($PasswordSet.SetBiosPassword("smp,$SystemManagementPassword,$SystemManagementPassword,ascii,us").Return -eq "Success")
+        if(($Interface.SetBiosSetting($testValue)).Return -eq "Success")
 	    {
 		    Write-LogEntry -Value "The specified system management password matches the currently set password" -Severity 1
         }
