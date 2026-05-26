@@ -10,7 +10,7 @@
             4 - Not Supported
             5 - Memory Error
             6 - Protocol Error
-    
+
     .PARAMETER GetSettings
         Instruct the script to get a list of current BIOS settings
 
@@ -22,6 +22,9 @@
 
     .PARAMETER AdminPassword
         The current BIOS password
+
+    .PARAMETER AdminPasswordCmsFile
+        Specify the path to a CMS-encrypted file containing the current BIOS (admin) password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of AdminPassword to keep the password off the command line. Cannot be combined with AdminPassword.
 
     .PARAMETER SetDefaults
         Instructs the script to set all BIOS settings to a default value. Accptable values are (BuiltInSafeDefaults,LastKnownGood,Factory,UserConf1,UserConf2)
@@ -42,6 +45,9 @@
         #Set BIOS settings supplied in a CSV file
         Manage-DellBiosSettings-WMI.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -AdminPassword ExamplePassword
 
+        #Set BIOS settings using an admin password sourced from a CMS-encrypted file
+        Manage-DellBiosSettings-WMI.ps1 -SetSettings -AdminPasswordCmsFile C:\Temp\admin.cms
+
         #Set all BIOS settings to factory default values
         Manage-DellBiosSettings-WMI.ps1 -SetDefaults Factory -AdminPassword ExamplePassword
 
@@ -58,17 +64,38 @@
         Manage-DellBiosSettings-WMI.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
 
     .NOTES
-        Created by: Jon Anderson (@ConfigJon)
+        Created by: Jon Anderson
         Reference: https://www.configjon.com/dell-bios-settings-management-wmi/
-        Modified: 2020-09-17
+        Version: 2.3.0
+        Modified: 2026-05-24
 
     .CHANGELOG
-        2020-09-17 - Improved the log file path configuration
-        
+        See .NOTES Reference for additional detail on each release.
+
+        2.3.0 (2026-05-24)
+            - Added secure password sourcing. New optional AdminPasswordCmsFile parameter sources the admin password from a CMS-encrypted file, decrypted in memory at runtime, so
+              the password never appears on the command line. The plain-text AdminPassword parameter is unchanged; specifying both is rejected.
+
+        2.1.0 (2026-05-23)
+            - Maintenance release — no user-facing changes.
+
+        2.0.0 (2026-05-21)
+            - Migrated all WMI access from Get-WmiObject to Get-CimInstance, and the SetAttribute, SetBIOSDefaults, boot order Set, and SecurityInterface.SetNewPassword calls to
+              Invoke-CimMethod, so the script runs on both Windows PowerShell 5.1 and PowerShell 7. Verified on Dell hardware against DellBIOSProvider 2.10.1.
+            - Fixed the boot order branch in Set-DellBiosSetting to test its own NewBootOrder parameter instead of the script-scope BootOrder object (the old check could route a
+              settings or defaults call into the boot order branch when SetBootOrder was combined with SetSettings or SetDefaults).
+            - Renamed the GetSettings CSV value column from CurrentValue to Value so an exported CSV can be re-imported with SetSettings, and added the current boot order to the
+              GetSettings output as a BootSequence entry to match the PSModule script.
+            - Added [CmdletBinding(PositionalBinding=$false)] so all arguments must be named.
+
+        Pre-2.0.0 (legacy)
+            2020-09-17 - Improved the log file path configuration
+
 #>
 
 #Parameters ===================================================================================================================
 
+[CmdletBinding(PositionalBinding=$false)]
 param(
     [Parameter(Mandatory=$false)][Switch]$GetSettings,
     [Parameter(Mandatory=$false)][Switch]$SetSettings,
@@ -76,23 +103,30 @@ param(
     [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$SetBootOrder,
     [Parameter(Mandatory=$false)][ValidateSet('UEFI','Legacy')]$BootMode,
     [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$AdminPassword,
+    [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$AdminPasswordCmsFile,
     [ValidateScript({
-        if($_ -notmatch "(\.csv)")
-        {
-            throw "The specified file must be a .csv file"
-        }
-        return $true 
-    })]
+            if($_ -notmatch "(\.csv)")
+            {
+                throw "The specified file must be a .csv file"
+            }
+            return $true
+        })]
     [System.IO.FileInfo]$CsvPath,
     [Parameter(Mandatory=$false)][ValidateScript({
-        if($_ -notmatch "(\.log)")
-        {
-            throw "The file specified in the LogFile paramter must be a .log file"
-        }
-        return $true
-    })]
+            if($_ -notmatch "(\.log)")
+            {
+                throw "The file specified in the LogFile paramter must be a .log file"
+            }
+            return $true
+        })]
     [System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\Dell\Manage-DellBiosSettings-WMI.log"
 )
+
+#Script version
+$Version = '2.3.0'
+
+#Log component name
+$Component = 'Manage-DellBiosSettings-WMI'
 
 #List of settings to be configured ============================================================================================
 #==============================================================================================================================
@@ -110,31 +144,31 @@ $Settings = (
 Function Get-TaskSequenceStatus
 {
     #Determine if a task sequence is currently running
-	try
-	{
-		$TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
-	}
-	catch{}
-	if($NULL -eq $TSEnv)
-	{
-		return $False
-	}
-	else
-	{
-		try
-		{
-			$SMSTSType = $TSEnv.Value("_SMSTSType")
-		}
-		catch{}
-		if($NULL -eq $SMSTSType)
-		{
-			return $False
-		}
-		else
-		{
-			return $True
-		}
-	}
+    try
+    {
+        $TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
+    }
+    catch{}
+    if($NULL -eq $TSEnv)
+    {
+        return $False
+    }
+    else
+    {
+        try
+        {
+            $SMSTSType = $TSEnv.Value("_SMSTSType")
+        }
+        catch{}
+        if([string]::IsNullOrEmpty($SMSTSType))
+        {
+            return $False
+        }
+        else
+        {
+            return $True
+        }
+    }
 }
 
 Function Stop-Script
@@ -153,76 +187,87 @@ Function Stop-Script
     throw $ErrorMessage
 }
 
+Function Get-CmsPassword
+{
+    #Decrypt one or more CMS-encrypted password files and return the plain-text value(s).
+    #Decryption uses the device's store-resident document-encryption certificate (the matching private key must be present in Cert:\LocalMachine\My or Cert:\CurrentUser\My).
+    #One plain-text value is returned per file, preserving the input order so [String[]] password slots round-trip.
+    #The decrypted value is never written to the log, only the file path and a generic failure reason.
+
+    param(
+        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String[]]$CmsFile
+    )
+    $Result = foreach($File in $CmsFile)
+    {
+        if(!(Test-Path -LiteralPath $File))
+        {
+            Stop-Script -ErrorMessage "CMS password file not found: $File"
+        }
+        try
+        {
+            Unprotect-CmsMessage -LiteralPath $File -ErrorAction Stop
+        }
+        catch
+        {
+            Stop-Script -ErrorMessage "Failed to decrypt the CMS password file: $File. Ensure the document-encryption certificate's private key is present in the certificate store" -Exception $_.Exception.Message
+        }
+    }
+    return $Result
+}
+
 Function Get-WmiData
 {
-	#Gets WMI data using either the WMI or CIM cmdlets and stores the data in a variable
+    #Gets WMI data using the CIM cmdlets and stores the data in a variable
 
     param(
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ClassName,
-        [Parameter(Mandatory=$true)][ValidateSet('CIM','WMI')]$CmdletType,
         [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
-	)
-	$Counter = 0
-	while($Counter -lt 6)
-	{
-       	if($CmdletType -eq "CIM")
-       	{
-           	if($Select)
-           	{
-				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-               	$Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
-           	}
-           	else
-           	{
-				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-               	$Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue
-           	}
-       	}
-       	elseif($CmdletType -eq "WMI")
-       	{
-           	if($Select)
-           	{
-				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-               	$Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
-           	}
-           	else
-           	{
-				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-               	$Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction SilentlyContinue
-			}
-		}
-		if($Query -eq $NULL)
-		{
-			if($Select)
-			{
-				Write-LogEntry -Value "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
-			}
-			else
-			{
-				Write-LogEntry -Value "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
-			}
-			Start-Sleep -Seconds 30
-			$Counter++
-		}
-		else
-		{
-			break
-		}
-	}
-	if($Query -eq $NULL)
-	{
-		if($Select)
-		{
-			Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace"
-		}
-		else
-		{
-			Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace"
-		}
-	}
-	Write-LogEntry -Value "Successfully connected to the $ClassName WMI class" -Severity 1
-	return $Query
+    )
+    $Counter = 0
+    while($Counter -lt 6)
+    {
+        if($Select)
+        {
+            Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
+            $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
+        }
+        else
+        {
+            Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
+            $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue
+        }
+        if($null -eq $Query)
+        {
+            if($Select)
+            {
+                Write-LogEntry -Value "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
+            }
+            else
+            {
+                Write-LogEntry -Value "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
+            }
+            Start-Sleep -Seconds 30
+            $Counter++
+        }
+        else
+        {
+            break
+        }
+    }
+    if($null -eq $Query)
+    {
+        if($Select)
+        {
+            Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace"
+        }
+        else
+        {
+            Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace"
+        }
+    }
+    Write-LogEntry -Value "Successfully connected to the $ClassName WMI class" -Severity 1
+    return $Query
 }
 
 Function Set-DellBiosSetting
@@ -238,24 +283,24 @@ Function Set-DellBiosSetting
         [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$Defaults
     )
     #Set the boot order
-    if($BootOrder)
+    if($NewBootOrder)
     {
         [String]$CurrentValue = $BootOrder | Where-Object BootListType -eq $BootMode | Select-Object -ExpandProperty BootOrder
 
         if($CurrentValue -eq $NewBootOrder)
         {
-                Write-LogEntry -Value "The ""$BootMode"" boot order is already set to ""$NewBootOrder""" -Severity 1
-                $Script:AlreadySet++
+            Write-LogEntry -Value "The ""$BootMode"" boot order is already set to ""$NewBootOrder""" -Severity 1
+            $Script:AlreadySet++
         }
         else
         {
             if(!([String]::IsNullOrEmpty($Password)))
             {
-                $SettingResult = ($BootOrderInterface.Set(1,$Bytes.Length,$Bytes,$BootMode,$NewBootOrder.Count,$NewBootOrder)).Status
+                $SettingResult = (Invoke-CimMethod -InputObject $BootOrderInterface -MethodName Set -Arguments @{SecType=[uint32]1; SecHndCount=[uint32]$Bytes.Length; SecHandle=[byte[]]$Bytes; BootListType=$BootMode; BOCount=[uint32]$NewBootOrder.Count; BootOrder=[string[]]$NewBootOrder}).Status
             }
             else
             {
-                $SettingResult = ($BootOrderInterface.Set(0,0,0,$BootMode,$NewBootOrder.Count,$NewBootOrder)).Status
+                $SettingResult = (Invoke-CimMethod -InputObject $BootOrderInterface -MethodName Set -Arguments @{SecType=[uint32]0; SecHndCount=[uint32]0; SecHandle=[byte[]]@(); BootListType=$BootMode; BOCount=[uint32]$NewBootOrder.Count; BootOrder=[string[]]$NewBootOrder}).Status
             }
             if($SettingResult -eq 0)
             {
@@ -274,11 +319,11 @@ Function Set-DellBiosSetting
     {
         if(!([String]::IsNullOrEmpty($Password)))
         {
-            $SettingResult = ($AttributeInterface.SetBIOSDefaults(1,$Bytes.Length,$Bytes,$Defaults)).Status
+            $SettingResult = (Invoke-CimMethod -InputObject $AttributeInterface -MethodName SetBIOSDefaults -Arguments @{SecType=[uint32]1; SecHndCount=[uint32]$Bytes.Length; SecHandle=[byte[]]$Bytes; DefaultType=[byte]$Defaults}).Status
         }
         else
         {
-            $SettingResult = ($AttributeInterface.SetBIOSDefaults(0,0,0,$Defaults)).Status
+            $SettingResult = (Invoke-CimMethod -InputObject $AttributeInterface -MethodName SetBIOSDefaults -Arguments @{SecType=[uint32]0; SecHndCount=[uint32]0; SecHandle=[byte[]]@(); DefaultType=[byte]$Defaults}).Status
         }
         if($SettingResult -eq 0)
         {
@@ -309,13 +354,13 @@ Function Set-DellBiosSetting
             {
                 if(!([String]::IsNullOrEmpty($Password)))
                 {
-                    $SettingResult = ($AttributeInterface.SetAttribute(1,$Bytes.Length,$Bytes,$Name,$Value)).Status
+                    $SettingResult = (Invoke-CimMethod -InputObject $AttributeInterface -MethodName SetAttribute -Arguments @{SecType=[uint32]1; SecHndCount=[uint32]$Bytes.Length; SecHandle=[byte[]]$Bytes; AttributeName=$Name; AttributeValue=$Value}).Status
                 }
                 else
                 {
-                    $SettingResult = ($AttributeInterface.SetAttribute(0,0,0,$Name,$Value)).Status
+                    $SettingResult = (Invoke-CimMethod -InputObject $AttributeInterface -MethodName SetAttribute -Arguments @{SecType=[uint32]0; SecHndCount=[uint32]0; SecHandle=[byte[]]@(); AttributeName=$Name; AttributeValue=$Value}).Status
                 }
-            
+
                 if($SettingResult -eq 0)
                 {
                     Write-LogEntry -Value "Successfully set ""$Name"" to ""$Value""" -Severity 1
@@ -339,20 +384,23 @@ Function Set-DellBiosSetting
 
 Function Write-LogEntry
 {
-#Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
+    #Write data to a CMTrace compatible log file. (Credit to MSEndpointMgr - https://www.msendpointmgr.com/)
 
-	param(
-		[parameter(Mandatory = $true, HelpMessage = "Value added to the log file.")]
-		[ValidateNotNullOrEmpty()]
-		[string]$Value,
-		[parameter(Mandatory = $true, HelpMessage = "Severity for the log entry. 1 for Informational, 2 for Warning and 3 for Error.")]
-		[ValidateNotNullOrEmpty()]
-		[ValidateSet("1", "2", "3")]
-		[string]$Severity,
-		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
-		[ValidateNotNullOrEmpty()]
-		[string]$FileName = ($script:LogFile | Split-Path -Leaf)
-	)
+    param(
+        [parameter(Mandatory = $true, HelpMessage = "Value added to the log file.")]
+        [ValidateNotNullOrEmpty()]
+        [string]$Value,
+        [parameter(Mandatory = $true, HelpMessage = "Severity for the log entry. 1 for Informational, 2 for Warning and 3 for Error.")]
+        [ValidateNotNullOrEmpty()]
+        [ValidateSet("1", "2", "3")]
+        [string]$Severity,
+        [parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
+        [ValidateNotNullOrEmpty()]
+        [string]$FileName = ($script:LogFile | Split-Path -Leaf),
+        [parameter(Mandatory = $false, HelpMessage = "Name of the component that the log entry will be associated with.")]
+        [ValidateNotNullOrEmpty()]
+        [string]$Component = $script:Component
+    )
     #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
     #Construct time stamp for log entry
@@ -374,7 +422,7 @@ Function Write-LogEntry
     #Construct context for log entry
     $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
     #Construct final log entry
-    $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-DellBiosSettings-WMI"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
+    $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""$($Component)"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
     #Add value to log file
     try
     {
@@ -391,33 +439,44 @@ Function Write-LogEntry
 #Configure Logging and task sequence variables
 if(Get-TaskSequenceStatus)
 {
-	$TSEnv = New-Object -COMObject Microsoft.SMS.TSEnvironment
-	$LogsDirectory = $TSEnv.Value("_SMSTSLogPath")
+    $TSEnv = New-Object -COMObject Microsoft.SMS.TSEnvironment
+    $LogsDirectory = $TSEnv.Value("_SMSTSLogPath")
 }
 else
 {
-	$LogsDirectory = ($LogFile | Split-Path)
-	if([string]::IsNullOrEmpty($LogsDirectory))
-	{
-		$LogsDirectory = $PSScriptRoot
-	}
-	else
-	{
-		if(!(Test-Path -PathType Container $LogsDirectory))
-		{
-			try
-			{
-				New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
-			}
-			catch
-			{
-				throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
-			}
-		}
-	}
+    $LogsDirectory = ($LogFile | Split-Path)
+    if([string]::IsNullOrEmpty($LogsDirectory))
+    {
+        $LogsDirectory = $PSScriptRoot
+    }
+    else
+    {
+        if(!(Test-Path -PathType Container $LogsDirectory))
+        {
+            try
+            {
+                New-Item -Path $LogsDirectory -ItemType "Directory" -Force -ErrorAction Stop | Out-Null
+            }
+            catch
+            {
+                throw "Failed to create the log file directory: $LogsDirectory. Exception Message: $($PSItem.Exception.Message)"
+            }
+        }
+    }
 }
 Write-Output "Log path set to $LogFile"
-Write-LogEntry -Value "START - Dell BIOS settings management script" -Severity 1
+Write-LogEntry -Value "START - Dell BIOS settings management script (version $Version)" -Severity 1
+
+#Resolve secure password sources (decrypt any CMS-encrypted password file into the standard password variable)
+if($AdminPassword -and $AdminPasswordCmsFile)
+{
+    Stop-Script -ErrorMessage "Specify either the AdminPassword or the AdminPasswordCmsFile parameter, not both"
+}
+if($AdminPasswordCmsFile)
+{
+    Write-LogEntry -Value "Decrypting the admin password from the supplied CMS file" -Severity 1
+    $AdminPassword = Get-CmsPassword -CmsFile $AdminPasswordCmsFile
+}
 
 #Parameter validation
 Write-LogEntry -Value "Begin parameter validation" -Severity 1
@@ -439,41 +498,41 @@ if($SetBootOrder -and !($BootMode))
 }
 if($SetSettings -and $SetDefaults)
 {
-	$ErrorMsg = "Both the SetSettings and SetDefaults parameters have been used. The SetDefaults parameter will override any other settings"
+    $ErrorMsg = "Both the SetSettings and SetDefaults parameters have been used. The SetDefaults parameter will override any other settings"
     Write-LogEntry -Value $ErrorMsg -Severity 2
 }
 if($SetBootOrder -and $SetDefaults)
 {
-	$ErrorMsg = "Both the SetBootOrder and SetDefaults parameters have been used. The SetDefaults parameter will override any other settings"
+    $ErrorMsg = "Both the SetBootOrder and SetDefaults parameters have been used. The SetDefaults parameter will override any other settings"
     Write-LogEntry -Value $ErrorMsg -Severity 2
 }
 if(($SetBootOrder -or $SetDefaults) -and $CsvPath -and !($SetSettings))
 {
-	$ErrorMsg = "The CsvPath parameter has been specified without the SetSettings paramter. The CSV file will be ignored"
+    $ErrorMsg = "The CsvPath parameter has been specified without the SetSettings paramter. The CSV file will be ignored"
     Write-LogEntry -Value $ErrorMsg -Severity 2
 }
 Write-LogEntry -Value "Parameter validation completed" -Severity 1
 
 #Connect to the BIOSAttributeInterface WMI class
-$AttributeInterface = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName BIOSAttributeInterface -CmdletType WMI
+$AttributeInterface = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName BIOSAttributeInterface
 
 #Connect to the SecurityInterface WMI class
-$SecurityInterface = Get-WmiData -Namespace root\dcim\sysman\wmisecurity -ClassName SecurityInterface -CmdletType WMI
+$SecurityInterface = Get-WmiData -Namespace root\dcim\sysman\wmisecurity -ClassName SecurityInterface
 
 #Connect to the EnumerationAttribute WMI class
-$Enumeration = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName EnumerationAttribute -CmdletType CIM -Select "AttributeName","CurrentValue","PossibleValue"
+$Enumeration = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName EnumerationAttribute -Select "AttributeName","CurrentValue","PossibleValue"
 
 #Connect to the IntegerAttribute WMI class
-$Integer = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName IntegerAttribute -CmdletType CIM -Select "AttributeName","CurrentValue","PossibleValue"
+$Integer = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName IntegerAttribute -Select "AttributeName","CurrentValue","PossibleValue"
 
 #Connect to the StringAttribute WMI class
-$String = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName StringAttribute -CmdletType CIM -Select "AttributeName","CurrentValue","PossibleValue"
+$String = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName StringAttribute -Select "AttributeName","CurrentValue","PossibleValue"
 
 #Connect to the BootOrder WMI class
 if($SetBootOrder -or $GetSettings)
 {
-    $BootOrder = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName BootOrder -CmdletType CIM
-    $BootOrderInterface = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName SetBootOrder -CmdletType WMI
+    $BootOrder = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName BootOrder
+    $BootOrderInterface = Get-WmiData -Namespace root\dcim\sysman\biosattributes -ClassName SetBootOrder
 }
 
 #Combine the setting lists into a single object
@@ -525,7 +584,7 @@ if($SetSettings -or $SetBootOrder)
 if($SetSettings -or $SetDefaults -or $SetBootOrder)
 {
     Write-LogEntry -Value "Get the current password state" -Severity 1
-    $AdminPasswordCheck = Get-CimInstance -Namespace root/dcim/sysman/wmisecurity -ClassName PasswordObject | Where-Object NameId -EQ "Admin" | Select-Object -ExpandProperty IsPasswordSet
+    $AdminPasswordCheck = Get-CimInstance -Namespace root\dcim\sysman\wmisecurity -ClassName PasswordObject | Where-Object NameId -EQ "Admin" | Select-Object -ExpandProperty IsPasswordSet
     if($AdminPasswordCheck -eq 1)
     {
         Write-LogEntry -Value "The admin password is currently set" -Severity 1
@@ -535,9 +594,9 @@ if($SetSettings -or $SetDefaults -or $SetBootOrder)
             Stop-Script -ErrorMessage "The admin password is set, but no password was supplied. Use the AdminPassword parameter when a password is set"
         }
         #Admin password set correctly
-        if(($SecurityInterface.SetNewPassword(1,$Bytes.Length,$Bytes,"Admin",$AdminPassword,$AdminPassword)).Status -eq 0)
-	    {
-		    Write-LogEntry -Value "The specified admin password matches the currently set password" -Severity 1
+        if((Invoke-CimMethod -InputObject $SecurityInterface -MethodName SetNewPassword -Arguments @{SecType=[uint32]1; SecHndCount=[uint32]$Bytes.Length; SecHandle=[byte[]]$Bytes; NameId="Admin"; OldPassword=$AdminPassword; NewPassword=$AdminPassword}).Status -eq 0)
+        {
+            Write-LogEntry -Value "The specified admin password matches the currently set password" -Severity 1
         }
         #Supervisor password not set correctly
         else
@@ -555,7 +614,7 @@ if($SetSettings -or $SetDefaults -or $SetBootOrder)
 if($GetSettings)
 {
     Write-LogEntry -Value "Getting a list of current BIOS settings" -Severity 1
-    #Write the current boot order to the log file
+    #Get the current boot order
     $BootListObject = $BootOrder | Where-Object IsActive -eq  1 | Select-Object BootListType,BootOrder
     Write-LogEntry -Value "The current boot order is: $($BootListObject.BootOrder)" -Severity 1
     #Get all other settings
@@ -563,10 +622,17 @@ if($GetSettings)
         $PossibleValue = [String]$Setting.PossibleValue
         [PSCustomObject]@{
             Name = $Setting.AttributeName
-            CurrentValue = $Setting.CurrentValue
+            Value = $Setting.CurrentValue
             PossibleValue = $PossibleValue
         }
     }
+    #Include the current boot order as a BootSequence entry to match the DellBIOSProvider script
+    $SettingObject += [PSCustomObject]@{
+        Name = "BootSequence"
+        Value = [String]$BootListObject.BootOrder
+        PossibleValue = ""
+    }
+    $SettingObject = $SettingObject | Sort-Object Name
     if($CsvPath)
     {
         Write-LogEntry -Value "Exporting settings to $CsvPath" -Severity 1
@@ -580,7 +646,7 @@ if($GetSettings)
 }
 
 if($SetSettings -or $SetDefaults -or $SetBootOrder)
-{    
+{
     #Import settings from CSV
     if($CsvPath)
     {
@@ -616,7 +682,7 @@ if($SetSettings -or $SetDefaults -or $SetBootOrder)
         if($SetDefaults)
         {
             Set-DellBiosSetting -Defaults $DefaultValue -Password $AdminPassword
-        }   
+        }
     }
     #Set Dell BIOS settings - password is not set
     else
@@ -633,14 +699,14 @@ if($SetSettings -or $SetDefaults -or $SetBootOrder)
             {
                 foreach($Setting in $Settings){
                     Set-DellBiosSetting -Name $Setting.Name -Value $Setting.Value
-                }   
+                }
             }
             else
             {
                 foreach($Setting in $Settings){
                     $Data = $Setting.Split(',')
                     Set-DellBiosSetting -Name $Data[0].Trim() -Value $Data[1].Trim()
-                }   
+                }
             }
         }
         #Set defaults
@@ -667,7 +733,7 @@ if($SetDefaults)
 {
     if($DefaultSet -eq $True)
     {
-        Write-Output "Successfully loaded ""$SetDefaults"" BIOS settings"    
+        Write-Output "Successfully loaded ""$SetDefaults"" BIOS settings"
     }
     else
     {

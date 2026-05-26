@@ -9,7 +9,7 @@
         Specify this swtich to clear an existing admin password. Must also specify the OldAdminPassword parameter.
 
     .PARAMETER SystemSet
-        Specify this switch to set a new system password or change an existing system password.
+        Specify this switch to set a new system password or change an existing setup password.
 
     .PARAMETER SystemClear
         Specify this switch to clear an existing system password. Must also specify the OldSystemPassword parameter.
@@ -52,23 +52,23 @@
 
     .EXAMPLE
         Set a new admin password
-        Manage-DellBiosPasswords-WMI.ps1 -AdminSet -AdminPassword <String>
+        Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -AdminPassword <String>
 
         Set or change a admin password
-        Manage-DellBiosPasswords-WMI.ps1 -AdminSet -AdminPassword <String> -OldAdminPassword <String1>,<String2>,<String3>
+        Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -AdminPassword <String> -OldAdminPassword <String1>,<String2>,<String3>
 
         Clear existing admin password(s)
-        Manage-DellBiosPasswords-WMI.ps1 -AdminClear -OldAdminPassword <String1>,<String2>,<String3>
+        Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminClear -OldAdminPassword <String1>,<String2>,<String3>
 
         Set a new admin password and set a new system password
-        Manage-DellBiosPasswords-WMI.ps1 -AdminSet -SystemSet -AdminPassword <String> -SystemPassword <String>
+        Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -SystemSet -AdminPassword <String> -SystemPassword <String>
 
         Set a new admin password sourced from a CMS-encrypted file
-        Manage-DellBiosPasswords-WMI.ps1 -AdminSet -AdminPasswordCmsFile <String>
+        Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -AdminPasswordCmsFile <String>
 
     .NOTES
         Created by: Jon Anderson
-        Reference: https://www.configjon.com/dell-bios-password-management-wmi/
+        Reference: https://www.configjon.com/dell-bios-password-management/
         Version: 2.3.0
         Modified: 2026-05-24
 
@@ -78,16 +78,23 @@
         2.3.0 (2026-05-24)
             - Added secure password sourcing. New optional CmsFile parameters mirror each existing password parameter and source the password from a CMS-encrypted file, decrypted
               in memory at runtime, so the password never appears on the command line. The plain-text parameters are unchanged; specifying both variants of the same password is rejected.
+            - Renamed the script and its default log file from the -PSModule suffix to -DellBIOSProvider, to match the DellBIOSProvider installer script and the HP HPCMSL variant naming.
 
         2.1.0 (2026-05-23)
             - Added a 2-password cap on the OldAdminPassword and OldSystemPassword parameters to match the HP and Lenovo scripts.
 
         2.0.0 (2026-05-21)
-            - Migrated all WMI access from Get-WmiObject to Get-CimInstance, and SecurityInterface.SetNewPassword calls to Invoke-CimMethod, so the script runs on both Windows
-              PowerShell 5.1 and PowerShell 7. Verified on Dell hardware against DellBIOSProvider 2.10.1.
-            - Added [CmdletBinding(PositionalBinding=$false)] so all arguments must be named.
+            - Added [CmdletBinding(PositionalBinding=$false)] so all arguments must be named, preventing a value from binding positionally to the wrong parameter (e.g. "-AdminSet
+              Password01" no longer silently populates AdminPassword).
+            - Hardened the DellBIOSProvider module version detection to match Install-DellBiosProvider.ps1 (sorts multiple installed package versions and uses recursive
+              DellBIOSProvider.psd1 discovery).
+            - Verified compatibility with DellBIOSProvider 2.10.1 and PowerShell 5.1 + 7.x.
 
         Pre-2.0.0 (legacy)
+            2020-01-30 - Removed the AdminChange and SystemChange parameters. AdminSet and SystemSet now work to set or change a password. Changed the DellChangeAdmin task sequence variable to DellSetAdmin.
+                         Changed the DellChangeSystem task sequence variable to DellSetSystem. Updated the parameter validation checks.
+            2020-09-07 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Dell. Changed the default log file name to Manage-DellBiosPasswords-PSModule.log
+                         Consolidated duplicate code into new functions (Stop-Script, New-DellBiosPassword, Set-DellBiosPassword, Clear-DellBiosPassword). Made a number of minor formatting and syntax changes
             2020-09-14 - When using the AdminSet and SystemSet parameters, the OldPassword parameters are no longer required. There is now logic to handle and report this type of failure.
             2020-09-17 - Improved the log file path configuration
 
@@ -119,14 +126,14 @@ param(
             }
             return $true
         })]
-    [System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\Dell\Manage-DellBiosPasswords-WMI.log"
+    [System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\Dell\Manage-DellBiosPasswords-DellBIOSProvider.log"
 )
 
 #Script version
 $Version = '2.3.0'
 
 #Log component name
-$Component = 'Manage-DellBiosPasswords-WMI'
+$Component = 'Manage-DellBiosPasswords-DellBIOSProvider'
 
 #Functions ====================================================================================================================
 
@@ -204,61 +211,6 @@ Function Get-CmsPassword
     return $Result
 }
 
-Function Get-WmiData
-{
-    #Gets WMI data using the CIM cmdlets and stores the data in a variable
-
-    param(
-        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
-        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ClassName,
-        [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
-    )
-    $Counter = 0
-    while($Counter -lt 6)
-    {
-        if($Select)
-        {
-            Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-            $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
-        }
-        else
-        {
-            Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-            $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue
-        }
-        if($null -eq $Query)
-        {
-            if($Select)
-            {
-                Write-LogEntry -Value "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
-            }
-            else
-            {
-                Write-LogEntry -Value "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
-            }
-            Start-Sleep -Seconds 30
-            $Counter++
-        }
-        else
-        {
-            break
-        }
-    }
-    if($null -eq $Query)
-    {
-        if($Select)
-        {
-            Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace"
-        }
-        else
-        {
-            Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace"
-        }
-    }
-    Write-LogEntry -Value "Successfully connected to the $ClassName WMI class" -Severity 1
-    return $Query
-}
-
 Function New-DellBiosPassword
 {
     param(
@@ -269,30 +221,37 @@ Function New-DellBiosPassword
     #Attempt to set the system password when the admin password is already set
     if($AdminPW)
     {
-        #Encode the AdminPassword
-        $AdminBytes = $Script:Encoder.GetBytes($AdminPW)
-
-        if((Invoke-CimMethod -InputObject $SecurityInterface -MethodName SetNewPassword -Arguments @{SecType=[uint32]1; SecHndCount=[uint32]$AdminBytes.Length; SecHandle=[byte[]]$AdminBytes; NameId=$PasswordType; OldPassword=$AdminPW; NewPassword=$Password}).Status -eq 0)
+        $Error.Clear()
+        try
         {
-            Write-LogEntry -Value "The $PasswordType password has been successfully set" -Severity 1
+            Set-Item -Path "DellSmbios:\Security\$($PasswordType)Password" $Password -Password $AdminPW -ErrorAction Stop
         }
-        else
+        catch
         {
             Set-Variable -Name "$($PasswordType)PWExists" -Value "Failed" -Scope Script
             Write-LogEntry -Value "Failed to set the $PasswordType password" -Severity 3
+        }
+        if(!($Error))
+        {
+            Write-LogEntry -Value "The $PasswordType password has been successfully set" -Severity 1
         }
     }
     #Attempt to set the admin or system password
     else
     {
-        if((Invoke-CimMethod -InputObject $SecurityInterface -MethodName SetNewPassword -Arguments @{SecType=[uint32]0; SecHndCount=[uint32]0; SecHandle=[byte[]]@(); NameId=$PasswordType; OldPassword=""; NewPassword=$Password}).Status -eq 0)
+        $Error.Clear()
+        try
         {
-            Write-LogEntry -Value "The $PasswordType password has been successfully set" -Severity 1
+            Set-Item -Path "DellSmbios:\Security\$($PasswordType)Password" $Password -ErrorAction Stop
         }
-        else
+        catch
         {
             Set-Variable -Name "$($PasswordType)PWExists" -Value "Failed" -Scope Script
             Write-LogEntry -Value "Failed to set the $PasswordType password" -Severity 3
+        }
+        if(!($Error))
+        {
+            Write-LogEntry -Value "The $PasswordType password has been successfully set" -Severity 1
         }
     }
 }
@@ -304,37 +263,35 @@ Function Set-DellBiosPassword
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Password,
         [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$OldPassword
     )
-    #Encode the password
-    $PasswordBytes = $Script:Encoder.GetBytes($Password)
     Write-LogEntry -Value "Attempt to change the existing $PasswordType password" -Severity 1
     Set-Variable -Name "$($PasswordType)PWSet" -Value "Failed" -Scope Script
     if(Get-TaskSequenceStatus)
     {
         $TSEnv.Value("DellSet$($PasswordType)") = "Failed"
     }
-    #Check if the password is already set to the correct value
-    if((Invoke-CimMethod -InputObject $SecurityInterface -MethodName SetNewPassword -Arguments @{SecType=[uint32]1; SecHndCount=[uint32]$PasswordBytes.Length; SecHandle=[byte[]]$PasswordBytes; NameId=$PasswordType; OldPassword=$Password; NewPassword=$Password}).Status -eq 0)
+    try
     {
-        #Password is set to correct value
-        Set-Variable -Name "$($PasswordType)PWSet" -Value "Success" -Scope Script
-        if(Get-TaskSequenceStatus)
-        {
-            $TSEnv.Value("DellSet$($PasswordType)") = "Success"
-        }
-        Write-LogEntry -Value "The $PasswordType password is already set correctly" -Severity 1
+        Set-Item -Path "DellSmbios:\Security\$($PasswordType)Password" $Password -Password $Password -ErrorAction Stop
     }
-    #Password is not set to correct value
-    else
+    catch
     {
         if($OldPassword)
         {
+            $PasswordSetFail = $true
             $Counter = 0
-            while($Counter -lt $OldPassword.Count)
+            While($Counter -lt $OldPassword.Count)
             {
-                #Encode the old password
-                $OldBytes = $Script:Encoder.GetBytes($OldPassword[$Counter])
-                #Attempt to change the password
-                if((Invoke-CimMethod -InputObject $SecurityInterface -MethodName SetNewPassword -Arguments @{SecType=[uint32]1; SecHndCount=[uint32]$OldBytes.Length; SecHandle=[byte[]]$OldBytes; NameId=$PasswordType; OldPassword=$OldPassword[$Counter]; NewPassword=$Password}).Status -eq 0)
+                $Error.Clear()
+                try
+                {
+                    Set-Item -Path "DellSmbios:\Security\$($PasswordType)Password" $Password -Password $OldPassword[$Counter] -ErrorAction Stop
+                }
+                catch
+                {
+                    #Failed to change the password
+                    $Counter++
+                }
+                if(!($Error))
                 {
                     #Successfully changed the password
                     Set-Variable -Name "$($PasswordType)PWSet" -Value "Success" -Scope Script
@@ -345,14 +302,8 @@ Function Set-DellBiosPassword
                     Write-LogEntry -Value "The $PasswordType password has been successfully changed" -Severity 1
                     break
                 }
-                else
-                {
-                    #Failed to change the password
-                    $Counter++
-                }
             }
-            #Report password change failure
-            if((Get-Variable -Name "$($PasswordType)PWSet" -ValueOnly -Scope Script) -eq "Failed")
+            if((Get-Variable -Name "$($PasswordType)PWSet").Value -eq "Failed")
             {
                 Write-LogEntry -Value "Failed to change the $PasswordType password" -Severity 3
             }
@@ -361,6 +312,16 @@ Function Set-DellBiosPassword
         {
             Write-LogEntry -Value "The $PasswordType password is currently set to something other than then supplied value, but no old passwords were supplied. Try supplying additional values using the Old$($PasswordType)Password parameter" -Severity 3
         }
+    }
+    if(!($PasswordSetFail))
+    {
+        #Password already correct
+        Set-Variable -Name "$($PasswordType)PWSet" -Value "Success" -Scope Script
+        if(Get-TaskSequenceStatus)
+        {
+            $TSEnv.Value("DellSet$($PasswordType)") = "Success"
+        }
+        Write-LogEntry -Value "The $PasswordType password is already set correctly" -Severity 1
     }
 }
 
@@ -377,12 +338,19 @@ Function Clear-DellBiosPassword
         $TSEnv.Value("DellClear$($PasswordType)") = "Failed"
     }
     $Counter = 0
-    while($Counter -lt $OldPassword.Count)
+    While($Counter -lt $OldPassword.Count)
     {
-        #Encode the old password
-        $OldBytes = $Script:Encoder.GetBytes($OldPassword[$Counter])
-        #Attempt to clear the password
-        if((Invoke-CimMethod -InputObject $SecurityInterface -MethodName SetNewPassword -Arguments @{SecType=[uint32]1; SecHndCount=[uint32]$OldBytes.Length; SecHandle=[byte[]]$OldBytes; NameId=$PasswordType; OldPassword=$OldPassword[$Counter]; NewPassword=""}).Status -eq 0)
+        $Error.Clear()
+        try
+        {
+            Set-Item -Path "DellSmbios:\Security\$($PasswordType)Password" "" -Password $OldPassword[$Counter] -ErrorAction Stop
+        }
+        catch
+        {
+            #Failed to clear the password
+            $Counter++
+        }
+        if(!($Error))
         {
             #Successfully cleared the password
             Set-Variable -Name "$($PasswordType)PWClear" -Value "Success" -Scope Script
@@ -390,17 +358,19 @@ Function Clear-DellBiosPassword
             {
                 $TSEnv.Value("DellClear$($PasswordType)") = "Success"
             }
-            Write-LogEntry -Value "The $PasswordType password has been successfully cleared" -Severity 1
-            break
-        }
-        else
-        {
-            #Failed to clear the password
-            $Counter++
+            if(($Script:SystemPasswordCheck -eq "True") -and $PasswordType -eq "Admin")
+            {
+                Write-LogEntry -Value "The admin password and system password have been successfully cleared" -Severity 1
+                break
+            }
+            else
+            {
+                Write-LogEntry -Value "The $PasswordType password has been successfully cleared" -Severity 1
+                break
+            }
         }
     }
-    #Report password clear failure
-    if((Get-Variable -Name "$($PasswordType)PWClear" -ValueOnly -Scope Script) -eq "Failed")
+    if((Get-Variable -Name "$($PasswordType)PWClear").Value -eq "Failed")
     {
         Write-LogEntry -Value "Failed to clear the $PasswordType password" -Severity 3
     }
@@ -440,7 +410,7 @@ Function Write-LogEntry
         [ValidateNotNullOrEmpty()]
         [string]$Component = $script:Component
     )
-    # Determine log file location
+    #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
     #Construct time stamp for log entry
     if(-not(Test-Path -Path 'variable:global:TimezoneBias'))
@@ -544,20 +514,83 @@ if($OldSystemPasswordCmsFile)
     $OldSystemPassword = Get-CmsPassword -CmsFile $OldSystemPasswordCmsFile
 }
 
-#Connect to the SecurityInterface WMI class
-$SecurityInterface = Get-WmiData -Namespace root\dcim\sysman\wmisecurity -ClassName SecurityInterface
+#Check if 32 or 64 bit architecture
+if([System.Environment]::Is64BitOperatingSystem)
+{
+    $ModuleInstallPath = $env:ProgramFiles
+}
+else
+{
+    $ModuleInstallPath = ${env:ProgramFiles(x86)}
+}
 
-#Connect to the PasswordObject CIM instance
-$PasswordObject = Get-WmiData -Namespace root\dcim\sysman\wmisecurity -ClassName PasswordObject
+#Verify the DellBIOSProvider module is installed
+Write-LogEntry -Value "Checking the version of the currently installed DellBIOSProvider module" -Severity 1
+try
+{
+    $LocalVersion = Get-Package DellBIOSProvider -ErrorAction Stop |
+        Select-Object -ExpandProperty Version -ErrorAction Stop |
+        Sort-Object { [Version]$_ } -Descending |
+        Select-Object -First 1
+}
+catch
+{
+    $Local = $true
+    $LocalModuleRoot = "$ModuleInstallPath\WindowsPowerShell\Modules\DellBIOSProvider"
+    $LocalPsd1 = if(Test-Path $LocalModuleRoot) { Get-ChildItem -Path $LocalModuleRoot -Filter 'DellBIOSProvider.psd1' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1 } else { $null }
+    if($LocalPsd1)
+    {
+        $LocalVersion = Get-Content $LocalPsd1.FullName | Select-String "ModuleVersion ="
+        $LocalVersion = (([regex]".*'(.*)'").Matches($LocalVersion))[0].Groups[1].Value
+        if($null -ne $LocalVersion)
+        {
+            Write-LogEntry -Value "The version of the currently installed DellBIOSProvider module is $LocalVersion" -Severity 1
+        }
+        else
+        {
+            Stop-Script -ErrorMessage "DellBIOSProvider module not found on the local machine"
+        }
+    }
+    else
+    {
+        Stop-Script -ErrorMessage "DellBIOSProvider module not found on the local machine"
+    }
+}
+if(($null -ne $LocalVersion) -and (!($Local)))
+{
+    Write-LogEntry -Value "The version of the currently installed DellBIOSProvider module is $LocalVersion" -Severity 1
+}
 
-#Create the encoding object used for working with the passwords
-$Encoder = New-Object System.Text.UTF8Encoding
+#Verify the DellBIOSProvider module is imported
+Write-LogEntry -Value "Verify the DellBIOSProvider module is imported" -Severity 1
+$ModuleCheck = Get-Module DellBIOSProvider
+if($ModuleCheck)
+{
+    Write-LogEntry -Value "The DellBIOSProvider module is already imported" -Severity 1
+}
+else
+{
+    Write-LogEntry -Value "Importing the DellBIOSProvider module" -Severity 1
+    $Error.Clear()
+    try
+    {
+        Import-Module DellBIOSProvider -Force -ErrorAction Stop
+    }
+    catch
+    {
+        Stop-Script -ErrorMessage "Failed to import the DellBIOSProvider module" -Exception $PSItem.Exception.Message
+    }
+    if(!($Error))
+    {
+        Write-LogEntry -Value "Successfully imported the DellBIOSProvider module" -Severity 1
+    }
+}
 
 #Get the current password status
 Write-LogEntry -Value "Get the current password state" -Severity 1
 
-$AdminPasswordCheck = ($PasswordObject | Where-Object NameId -EQ "Admin").IsPasswordSet
-if($AdminPasswordCheck -eq 1)
+$AdminPasswordCheck = Get-Item -Path DellSmbios:\Security\IsAdminPasswordSet | Select-Object -ExpandProperty CurrentValue
+if($AdminPasswordCheck -eq "True")
 {
     Write-LogEntry -Value "The Admin password is currently set" -Severity 1
 }
@@ -565,8 +598,8 @@ else
 {
     Write-LogEntry -Value "The Admin password is not currently set" -Severity 1
 }
-$SystemPasswordCheck = ($PasswordObject | Where-Object NameId -EQ "System").IsPasswordSet
-if($SystemPasswordCheck -eq 1)
+$SystemPasswordCheck = Get-Item -Path DellSmbios:\Security\IsSystemPasswordSet | Select-Object -ExpandProperty CurrentValue
+if($SystemPasswordCheck -eq "True")
 {
     Write-LogEntry -Value "The System password is currently set" -Severity 1
 }
@@ -589,7 +622,7 @@ if(($SystemSet) -and !($SystemPassword))
 {
     Stop-Script -ErrorMessage "When using the SystemSet switch, the SystemPassword parameter must also be specified"
 }
-if(($SystemSet -and $AdminPasswordCheck -eq 1) -and !($AdminPassword))
+if(($SystemSet -and $AdminPasswordCheck -eq "True") -and !($AdminPassword))
 {
     Stop-Script -ErrorMessage "When attempting to set a system password while the admin password is already set, the AdminPassword parameter must be specified"
 }
@@ -617,7 +650,7 @@ if(($OldSystemPassword -or $SystemPassword) -and !($SystemSet -or $SystemClear))
 {
     Stop-Script -ErrorMessage "When using the OldSystemPassword or SystemPassword parameters, one of the SystemSet or SystemClear parameters must also be specified"
 }
-if(($AdminClear) -and ($SystemPasswordCheck -eq 1))
+if(($AdminClear) -and ($SystemPasswordCheck -eq "True"))
 {
     Write-LogEntry -Value "Warning: The the AdminClear parameter has been specified and the system password is set. Clearing the admin password will also clear the system password." -Severity 2
 }
@@ -663,7 +696,7 @@ if(Get-TaskSequenceStatus)
 }
 
 #No admin password currently set
-if($AdminPasswordCheck -eq 0)
+if($AdminPasswordCheck -eq "False")
 {
     if($AdminClear)
     {
@@ -672,7 +705,7 @@ if($AdminPasswordCheck -eq 0)
     }
     if($AdminSet)
     {
-        if($SystemPasswordCheck -eq 1)
+        if($SystemPasswordCheck -eq "True")
         {
             $SystemAlreadySet = "Failed"
             Write-LogEntry -Value "Failed to set the admin password. The system password is already set." -Severity 3
@@ -685,7 +718,7 @@ if($AdminPasswordCheck -eq 0)
 }
 
 #No system password currently set
-if($SystemPasswordCheck -eq 0)
+if($SystemPasswordCheck -eq "False")
 {
     if($SystemClear)
     {
@@ -694,8 +727,7 @@ if($SystemPasswordCheck -eq 0)
     }
     if($SystemSet)
     {
-        #If the admin password is currently set, the admin password is required to set the system password
-        if(($PasswordObject | Where-Object NameId -EQ "Admin").IsPasswordSet -eq 1)
+        if((Get-Item -Path DellSmbios:\Security\IsAdminPasswordSet | Select-Object -ExpandProperty CurrentValue) -eq "True")
         {
             New-DellBiosPassword -PasswordType System -Password $SystemPassword -AdminPW $AdminPassword
         }
@@ -707,7 +739,7 @@ if($SystemPasswordCheck -eq 0)
 }
 
 #If a admin password is set, attempt to clear or change it
-if($AdminPasswordCheck -eq 1)
+if($AdminPasswordCheck -eq "True")
 {
     #Change the existing admin password
     if(($AdminSet) -and ($DellSetAdmin -ne "Success"))
@@ -729,7 +761,7 @@ if($AdminPasswordCheck -eq 1)
 }
 
 #If a system password is set, attempt to clear or change it
-if($SystemPasswordCheck -eq 1)
+if($SystemPasswordCheck -eq "True")
 {
     #Change the existing system password
     if(($SystemSet) -and ($DellSetSystem -ne "Success"))
