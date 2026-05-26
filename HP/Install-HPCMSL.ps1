@@ -56,27 +56,27 @@
 
 param(
     [ValidateScript({
-        if (-not ($_ | Test-Path))
-        {
-            throw "The ModulePath folder path does not exist"
-        }
-        if (-not ($_ | Test-Path -PathType Container))
-        {
-            throw "The ModulePath argument must be a folder path"
-        }
-        return $true
-    })]
+            if (-not ($_ | Test-Path))
+            {
+                throw "The ModulePath folder path does not exist"
+            }
+            if (-not ($_ | Test-Path -PathType Container))
+            {
+                throw "The ModulePath argument must be a folder path"
+            }
+            return $true
+        })]
     [Parameter(Mandatory = $false)][System.IO.DirectoryInfo]$ModulePath,
     [Parameter(Mandatory = $false)][switch]$AllEditions,
     [Parameter(Mandatory = $false)][switch]$Import,
     [Parameter(DontShow)][switch]$Rerun,
     [Parameter(Mandatory = $false)][ValidateScript({
-        if ($_ -notmatch '\.log$')
-        {
-            throw "The file specified in the LogFile parameter must be a .log file"
-        }
-        return $true
-    })]
+            if ($_ -notmatch '\.log$')
+            {
+                throw "The file specified in the LogFile parameter must be a .log file"
+            }
+            return $true
+        })]
     [System.IO.FileInfo]$LogFile = "$env:ProgramData\ConfigJonScripts\HP\Install-HPCMSL.log"
 )
 
@@ -101,7 +101,7 @@ function Get-TaskSequenceStatus
             $SMSTSType = $TSEnv.Value("_SMSTSType")
         }
         catch { }
-        if ($null -eq $SMSTSType)
+        if ([string]::IsNullOrEmpty($SMSTSType))
         {
             return $false
         }
