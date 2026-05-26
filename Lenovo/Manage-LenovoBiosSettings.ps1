@@ -16,7 +16,13 @@
 
     .PARAMETER SystemManagementPassword
         The current system management password
-    
+
+    .PARAMETER SupervisorPasswordCmsFile
+        Specify the path to a CMS-encrypted file containing the current supervisor password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of SupervisorPassword to keep the password off the command line. Cannot be combined with SupervisorPassword.
+
+    .PARAMETER SystemManagementPasswordCmsFile
+        Specify the path to a CMS-encrypted file containing the current system management password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of SystemManagementPassword to keep the password off the command line. Cannot be combined with SystemManagementPassword.
+
     .PARAMETER SetDefaults
         Instructs the script to set all BIOS settings to default values
 
@@ -26,7 +32,7 @@
     .EXAMPLE
         #Set BIOS settings supplied in the script when no password is set
         Manage-LenovoBiosSettings.ps1 -SetSettings
-    
+
         #Set BIOS settings supplied in the script when the supervisor password is set
         Manage-LenovoBiosSettings.ps1 -SetSettings -SupervisorPassword ExamplePassword
 
@@ -35,6 +41,9 @@
 
         #Set BIOS settings supplied in a CSV file
         Manage-LenovoBiosSettings.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -SupervisorPassword ExamplePassword
+
+        #Set BIOS settings using a supervisor password sourced from a CMS-encrypted file
+        Manage-LenovoBiosSettings.ps1 -SetSettings -SupervisorPasswordCmsFile C:\Temp\supervisor.cms
 
         #Output a list of current BIOS settings to the screen
         Manage-LenovoBiosSettings.ps1 -GetSettings
@@ -46,51 +55,83 @@
         Manage-LenovoBiosSettings.ps1 -SetDefaults -SupervisorPassword ExamplePassword
 
     .NOTES
-        Created by: Jon Anderson (@ConfigJon)
+        Created by: Jon Anderson
         Reference: https://www.configjon.com/lenovo-bios-settings-management/
-        Modified: 2020-10-18
+        Version: 2.3.0
+        Modified: 2026-05-24
 
     .CHANGELOG
-        2019-11-04 - Added additional logging. Changed the default log path to $ENV:ProgramData\BiosScripts\Lenovo.
-        2020-02-10 - Fixed a bug where the script would ignore the supplied Supervisior Password when attempting to change settings.
-        2020-02-21 - Added the ability to get a list of current BIOS settings on a system via the GetSettings parameter
-                     Added the ability to read settings from or write settings to a csv file with the CsvPath parameter
-                     Added the SetSettings parameter to indicate that the script should attempt to set settings
-                     Changed the $Settings array in the script to be comma seperated instead of semi-colon seperated
-                     Updated formatting
-        2020-09-16 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Lenovo.
-                     Consolidated duplicate code into new functions (Stop-Script, Get-WmiData). Made a number of minor formatting and syntax changes
-                     Updated the save BIOS settings section with better logic to work when a password is set.
-                     Added support for for using the system management password
-        2020-10-18 - Added the SetDefaults parameter. This allows for setting all BIOS settings to default values.
+        See .NOTES Reference for additional detail on each release.
+
+        2.3.0 (2026-05-24)
+            - Added secure password sourcing. New optional CmsFile parameters mirror each existing password parameter and source the password from a CMS-encrypted file, decrypted
+              in memory at runtime, so the password never appears on the command line. The plain-text parameters are unchanged; specifying both variants of the same password is rejected.
+
+        2.2.0 (2026-05-23)
+            - Added support for the modern Lenovo WMI opcode interface, which authorizes settings changes, default loads, and the password check without embedding the password in
+              the call. This allows complex/special-character supervisor and system management passwords. The script auto-detects the interface and falls back to the legacy
+              embedded-password method on systems without it. Parameters and overall behavior are unchanged.
+
+        2.1.0 (2026-05-23)
+            - The GetSettings output and CSV export now include a PossibleValue column to match the other manufacturer scripts.
+            - Added graceful handling for PasswordState 128 (BIOS certificate-based authentication in use).
+
+        2.0.0 (2026-05-22)
+            - Migrated all WMI access from Get-WmiObject to Get-CimInstance, and the Lenovo_SetBiosSetting.SetBIOSSetting, Lenovo_SaveBiosSettings.SaveBiosSettings,
+              Lenovo_LoadDefaultSettings.LoadDefaultSettings, and Lenovo_SetBiosPassword.SetBiosPassword calls to Invoke-CimMethod, so the script runs on both Windows PowerShell 5.1
+              and PowerShell 7.
+            - Added [CmdletBinding(PositionalBinding=$false)].
+
+        Pre-2.0.0 (legacy)
+            2019-11-04 - Added additional logging. Changed the default log path to $ENV:ProgramData\BiosScripts\Lenovo.
+            2020-02-10 - Fixed a bug where the script would ignore the supplied Supervisior Password when attempting to change settings.
+            2020-02-21 - Added the ability to get a list of current BIOS settings on a system via the GetSettings parameter
+                         Added the ability to read settings from or write settings to a csv file with the CsvPath parameter
+                         Added the SetSettings parameter to indicate that the script should attempt to set settings
+                         Changed the $Settings array in the script to be comma seperated instead of semi-colon seperated
+                         Updated formatting
+            2020-09-16 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Lenovo.
+                         Consolidated duplicate code into new functions (Stop-Script, Get-WmiData). Made a number of minor formatting and syntax changes
+                         Updated the save BIOS settings section with better logic to work when a password is set.
+                         Added support for for using the system management password
+            2020-10-18 - Added the SetDefaults parameter. This allows for setting all BIOS settings to default values.
 
 #>
 
 #Parameters ===================================================================================================================
 
+[CmdletBinding(PositionalBinding=$false)]
 param(
     [Parameter(Mandatory=$false)][Switch]$GetSettings,
     [Parameter(Mandatory=$false)][Switch]$SetSettings,
     [Parameter(Mandatory=$false)][Switch]$SetDefaults,
     [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$SupervisorPassword,
     [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$SystemManagementPassword,
+    [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$SupervisorPasswordCmsFile,
+    [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$SystemManagementPasswordCmsFile,
     [ValidateScript({
-        if($_ -notmatch "(\.csv)")
-        {
-            throw "The specified file must be a .csv file"
-        }
-        return $true 
-    })]
+            if($_ -notmatch "(\.csv)")
+            {
+                throw "The specified file must be a .csv file"
+            }
+            return $true
+        })]
     [System.IO.FileInfo]$CsvPath,
     [Parameter(Mandatory=$false)][ValidateScript({
-        if($_ -notmatch "(\.log)")
-        {
-            throw "The file specified in the LogFile paramter must be a .log file"
-        }
-        return $true
-    })]
+            if($_ -notmatch "(\.log)")
+            {
+                throw "The file specified in the LogFile paramter must be a .log file"
+            }
+            return $true
+        })]
     [System.IO.FileInfo]$LogFile = "$ENV:ProgramData\ConfigJonScripts\Lenovo\Manage-LenovoBiosSettings.log"
 )
+
+#Script version
+$Version = '2.3.0'
+
+#Log component name
+$Component = 'Manage-LenovoBiosSettings'
 
 #List of settings to be configured ============================================================================================
 #==============================================================================================================================
@@ -108,7 +149,7 @@ $Settings = (
     "Require Admin. Pass. For F12 Boot,Yes",
     "Physical Presence for Provisioning,Disabled",
     "PhysicalPresenceForTpmProvision,Disable",
-    "Physical Presnce for Clear,Disabled",
+    "Physical Presence for Clear,Disabled",
     "PhysicalPresenceForTpmClear,Disable",
     "Boot Up Num-Lock Status,Off"
 )
@@ -120,31 +161,31 @@ $Settings = (
 Function Get-TaskSequenceStatus
 {
     #Determine if a task sequence is currently running
-	try
-	{
-		$TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
-	}
-	catch{}
-	if($NULL -eq $TSEnv)
-	{
-		return $False
-	}
-	else
-	{
-		try
-		{
-			$SMSTSType = $TSEnv.Value("_SMSTSType")
-		}
-		catch{}
-		if($NULL -eq $SMSTSType)
-		{
-			return $False
-		}
-		else
-		{
-			return $True
-		}
-	}
+    try
+    {
+        $TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
+    }
+    catch{}
+    if($NULL -eq $TSEnv)
+    {
+        return $False
+    }
+    else
+    {
+        try
+        {
+            $SMSTSType = $TSEnv.Value("_SMSTSType")
+        }
+        catch{}
+        if([string]::IsNullOrEmpty($SMSTSType))
+        {
+            return $False
+        }
+        else
+        {
+            return $True
+        }
+    }
 }
 
 Function Stop-Script
@@ -163,54 +204,83 @@ Function Stop-Script
     throw $ErrorMessage
 }
 
+Function Get-CmsPassword
+{
+    #Decrypt one or more CMS-encrypted password files and return the plain-text value(s).
+    #Decryption uses the device's store-resident document-encryption certificate (the matching private key must be present in Cert:\LocalMachine\My or Cert:\CurrentUser\My).
+    #One plain-text value is returned per file, preserving the input order so [String[]] password slots round-trip.
+    #The decrypted value is never written to the log, only the file path and a generic failure reason.
+
+    param(
+        [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String[]]$CmsFile
+    )
+    $Result = foreach($File in $CmsFile)
+    {
+        if(!(Test-Path -LiteralPath $File))
+        {
+            Stop-Script -ErrorMessage "CMS password file not found: $File"
+        }
+        try
+        {
+            Unprotect-CmsMessage -LiteralPath $File -ErrorAction Stop
+        }
+        catch
+        {
+            Stop-Script -ErrorMessage "Failed to decrypt the CMS password file: $File. Ensure the document-encryption certificate's private key is present in the certificate store" -Exception $_.Exception.Message
+        }
+    }
+    return $Result
+}
+
 Function Get-WmiData
 {
-	#Gets WMI data using either the WMI or CIM cmdlets and stores the data in a variable
+    #Gets WMI data using the CIM cmdlets and stores the data in a variable
 
     param(
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$ClassName,
-        [Parameter(Mandatory=$true)][ValidateSet('CIM','WMI')]$CmdletType,
         [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
     )
-    try
-    {
-        if($CmdletType -eq "CIM")
-        {
-            if($Select)
-            {
-				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop | Select-Object $Select -ErrorAction Stop
-            }
-            else
-            {
-				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop
-            }
-        }
-        elseif($CmdletType -eq "WMI")
-        {
-            if($Select)
-            {
-				Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-                $Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction Stop | Select-Object $Select -ErrorAction Stop
-            }
-            else
-            {
-				Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-                $Query = Get-WmiObject -Namespace $Namespace -Class $ClassName -ErrorAction Stop
-            }
-        }
-    }
-    catch
+    $Counter = 0
+    while($Counter -lt 6)
     {
         if($Select)
         {
-            Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message
+            Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
+            $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
         }
         else
         {
-            Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace" -Exception $PSItem.Exception.Message	
+            Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
+            $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue
+        }
+        if($null -eq $Query)
+        {
+            if($Select)
+            {
+                Write-LogEntry -Value "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
+            }
+            else
+            {
+                Write-LogEntry -Value "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
+            }
+            Start-Sleep -Seconds 30
+            $Counter++
+        }
+        else
+        {
+            break
+        }
+    }
+    if($null -eq $Query)
+    {
+        if($Select)
+        {
+            Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace"
+        }
+        else
+        {
+            Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace"
         }
     }
     Write-LogEntry -Value "Successfully connected to the $ClassName WMI class" -Severity 1
@@ -229,13 +299,19 @@ Function Set-LenovoBiosSetting
     )
     if($Defaults)
     {
-        if(!([String]::IsNullOrEmpty($Password)))
+        if($UseOpcodeAuth)
         {
-            $SettingResult = ($DefaultSettings.LoadDefaultSettings("$Password,ascii,us")).Return
+            #Authorize with the supervisor password via the opcode interface, then load defaults without an embedded password
+            [void](Invoke-CimMethod -InputObject $OpcodeInterface -MethodName WmiOpcodeInterface -Arguments @{Parameter = "WmiOpcodePasswordAdmin:$Password;"})
+            $SettingResult = (Invoke-CimMethod -InputObject $DefaultSettings -MethodName LoadDefaultSettings).Return
+        }
+        elseif(!([String]::IsNullOrEmpty($Password)))
+        {
+            $SettingResult = (Invoke-CimMethod -InputObject $DefaultSettings -MethodName LoadDefaultSettings -Arguments @{parameter="$Password,ascii,us"}).Return
         }
         else
         {
-            $SettingResult = ($DefaultSettings.LoadDefaultSettings()).Return
+            $SettingResult = (Invoke-CimMethod -InputObject $DefaultSettings -MethodName LoadDefaultSettings).Return
         }
         if($SettingResult -eq "Success")
         {
@@ -273,13 +349,18 @@ Function Set-LenovoBiosSetting
             #Setting is not set to specified value
             else
             {
-                if(!([String]::IsNullOrEmpty($Password)))
+                if($UseOpcodeAuth)
                 {
-                    $SettingResult = ($Interface.SetBIOSSetting("$Name,$Value,$Password,ascii,us")).Return
+                    #The opcode interface authorizes the change at save time, so no password is embedded here
+                    $SettingResult = (Invoke-CimMethod -InputObject $Interface -MethodName SetBIOSSetting -Arguments @{parameter="$Name,$Value"}).Return
+                }
+                elseif(!([String]::IsNullOrEmpty($Password)))
+                {
+                    $SettingResult = (Invoke-CimMethod -InputObject $Interface -MethodName SetBIOSSetting -Arguments @{parameter="$Name,$Value,$Password,ascii,us"}).Return
                 }
                 else
                 {
-                    $SettingResult = ($Interface.SetBIOSSetting("$Name,$Value")).Return
+                    $SettingResult = (Invoke-CimMethod -InputObject $Interface -MethodName SetBIOSSetting -Arguments @{parameter="$Name,$Value"}).Return
                 }
                 if($SettingResult -eq "Success")
                 {
@@ -304,20 +385,23 @@ Function Set-LenovoBiosSetting
 
 Function Write-LogEntry
 {
-    #Write data to a CMTrace compatible log file. (Credit to SCConfigMgr - https://www.scconfigmgr.com/)
+    #Write data to a CMTrace compatible log file. (Credit to MSEndpointMgr - https://www.msendpointmgr.com/)
 
-	param(
-		[parameter(Mandatory = $true, HelpMessage = "Value added to the log file.")]
-		[ValidateNotNullOrEmpty()]
-		[string]$Value,
-		[parameter(Mandatory = $true, HelpMessage = "Severity for the log entry. 1 for Informational, 2 for Warning and 3 for Error.")]
-		[ValidateNotNullOrEmpty()]
-		[ValidateSet("1", "2", "3")]
-		[string]$Severity,
-		[parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
-		[ValidateNotNullOrEmpty()]
-		[string]$FileName = ($script:LogFile | Split-Path -Leaf)
-	)
+    param(
+        [parameter(Mandatory = $true, HelpMessage = "Value added to the log file.")]
+        [ValidateNotNullOrEmpty()]
+        [string]$Value,
+        [parameter(Mandatory = $true, HelpMessage = "Severity for the log entry. 1 for Informational, 2 for Warning and 3 for Error.")]
+        [ValidateNotNullOrEmpty()]
+        [ValidateSet("1", "2", "3")]
+        [string]$Severity,
+        [parameter(Mandatory = $false, HelpMessage = "Name of the log file that the entry will written to.")]
+        [ValidateNotNullOrEmpty()]
+        [string]$FileName = ($script:LogFile | Split-Path -Leaf),
+        [parameter(Mandatory = $false, HelpMessage = "Name of the component that the log entry will be associated with.")]
+        [ValidateNotNullOrEmpty()]
+        [string]$Component = $script:Component
+    )
     #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
     #Construct time stamp for log entry
@@ -339,7 +423,7 @@ Function Write-LogEntry
     #Construct context for log entry
     $Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
     #Construct final log entry
-    $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Manage-LenovoBiosSettings"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
+    $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""$($Component)"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
     #Add value to log file
     try
     {
@@ -356,12 +440,12 @@ Function Write-LogEntry
 #Configure Logging and task sequence variables
 if(Get-TaskSequenceStatus)
 {
-	$TSEnv = New-Object -COMObject Microsoft.SMS.TSEnvironment
-	$LogsDirectory = $TSEnv.Value("_SMSTSLogPath")
+    $TSEnv = New-Object -COMObject Microsoft.SMS.TSEnvironment
+    $LogsDirectory = $TSEnv.Value("_SMSTSLogPath")
 }
 else
 {
-	$LogsDirectory = ($LogFile | Split-Path)
+    $LogsDirectory = ($LogFile | Split-Path)
     if([string]::IsNullOrEmpty($LogsDirectory))
     {
         $LogsDirectory = $PSScriptRoot
@@ -382,7 +466,27 @@ else
     }
 }
 Write-Output "Log path set to $LogFile"
-Write-LogEntry -Value "START - Lenovo BIOS settings management script" -Severity 1
+Write-LogEntry -Value "START - Lenovo BIOS settings management script (version $Version)" -Severity 1
+
+#Resolve secure password sources (decrypt any CMS-encrypted password files into the standard password variables)
+if($SupervisorPassword -and $SupervisorPasswordCmsFile)
+{
+    Stop-Script -ErrorMessage "Specify either the SupervisorPassword or the SupervisorPasswordCmsFile parameter, not both"
+}
+if($SystemManagementPassword -and $SystemManagementPasswordCmsFile)
+{
+    Stop-Script -ErrorMessage "Specify either the SystemManagementPassword or the SystemManagementPasswordCmsFile parameter, not both"
+}
+if($SupervisorPasswordCmsFile)
+{
+    Write-LogEntry -Value "Decrypting the supervisor password from the supplied CMS file" -Severity 1
+    $SupervisorPassword = Get-CmsPassword -CmsFile $SupervisorPasswordCmsFile
+}
+if($SystemManagementPasswordCmsFile)
+{
+    Write-LogEntry -Value "Decrypting the system management password from the supplied CMS file" -Severity 1
+    $SystemManagementPassword = Get-CmsPassword -CmsFile $SystemManagementPasswordCmsFile
+}
 
 #Parameter validation
 Write-LogEntry -Value "Begin parameter validation" -Severity 1
@@ -400,35 +504,48 @@ if($SetSettings -and !($Settings -or $CsvPath))
 }
 if($SetSettings -and $SetDefaults)
 {
-	$ErrorMsg = "Both the SetSettings and SetDefaults parameters have been used. The SetDefaults parameter will override any other settings"
+    $ErrorMsg = "Both the SetSettings and SetDefaults parameters have been used. The SetDefaults parameter will override any other settings"
     Write-LogEntry -Value $ErrorMsg -Severity 2
 }
 if(($SetDefaults -and $CsvPath) -and !($SetSettings))
 {
-	$ErrorMsg = "The CsvPath parameter has been specified without the SetSettings paramter. The CSV file will be ignored"
+    $ErrorMsg = "The CsvPath parameter has been specified without the SetSettings paramter. The CSV file will be ignored"
     Write-LogEntry -Value $ErrorMsg -Severity 2
 }
 Write-LogEntry -Value "Parameter validation completed" -Severity 1
 
 #Connect to the Lenovo_BiosSetting WMI class
-$SettingList = Get-WmiData -Namespace root\wmi -ClassName Lenovo_BiosSetting -CmdletType WMI
+$SettingList = Get-WmiData -Namespace root\wmi -ClassName Lenovo_BiosSetting
 
 #Connect to the Lenovo_SetBiosSetting WMI class
-$Interface = Get-WmiData -Namespace root\wmi -ClassName Lenovo_SetBiosSetting -CmdletType WMI
+$Interface = Get-WmiData -Namespace root\wmi -ClassName Lenovo_SetBiosSetting
 
 #Connect to the Lenovo_SaveBiosSettings WMI class
-$SaveSettings = Get-WmiData -Namespace root\wmi -ClassName Lenovo_SaveBiosSettings -CmdletType WMI
+$SaveSettings = Get-WmiData -Namespace root\wmi -ClassName Lenovo_SaveBiosSettings
 
 #Connect to the Lenovo_BiosPasswordSettings WMI class
-$PasswordSettings = Get-WmiData -Namespace root\wmi -ClassName Lenovo_BiosPasswordSettings -CmdletType WMI
+$PasswordSettings = Get-WmiData -Namespace root\wmi -ClassName Lenovo_BiosPasswordSettings
 
 #Connect to the Lenovo_SetBiosPassword WMI class
-$PasswordSet = Get-WmiData -Namespace root\wmi -ClassName Lenovo_SetBiosPassword -CmdletType WMI
+$PasswordSet = Get-WmiData -Namespace root\wmi -ClassName Lenovo_SetBiosPassword
 
-#Connect to the Lenovo_SetBiosPassword WMI class
+#Determine whether the modern WMI opcode interface is available (required for complex passwords on newer systems). Fall back to the legacy method when it is not present.
+$UseOpcode = $false
+$OpcodeInterface = Get-CimInstance -Namespace root\wmi -ClassName Lenovo_WmiOpcodeInterface -ErrorAction SilentlyContinue | Select-Object -First 1
+if(($null -ne $OpcodeInterface) -and ($OpcodeInterface.Active -eq $true))
+{
+    $UseOpcode = $true
+    Write-LogEntry -Value "The Lenovo WMI opcode interface is available. Supervisor-authorized changes will use the opcode method (supports complex passwords)" -Severity 1
+}
+else
+{
+    Write-LogEntry -Value "The Lenovo WMI opcode interface is not available. Changes will use the legacy method" -Severity 1
+}
+
+#Connect to the Lenovo_LoadDefaultSettings WMI class
 if($SetDefaults)
 {
-    $DefaultSettings = Get-WmiData -Namespace root\wmi -ClassName Lenovo_LoadDefaultSettings -CmdletType WMI
+    $DefaultSettings = Get-WmiData -Namespace root\wmi -ClassName Lenovo_LoadDefaultSettings
 }
 
 #Set counters to 0
@@ -445,25 +562,35 @@ if($SetSettings -or $SetDefaults)
 Write-LogEntry -Value "Get the current password state" -Severity 1
 switch($PasswordSettings.PasswordState)
 {
-	{$_ -eq 0}
-	{
-		Write-LogEntry -Value "No passwords are currently set" -Severity 1
-	}
-	{($_ -eq 2) -or ($_ -eq 3) -or ($_ -eq 6) -or ($_ -eq 7) -or ($_ -eq 66) -or ($_ -eq 67) -or ($_ -eq 70) -or ($_-eq 71)}
-	{
-		$SvpSet = $true
-		Write-LogEntry -Value "The supervisor password is set" -Severity 1
-	}
-	{($_ -eq 64) -or ($_ -eq 65) -or ($_ -eq 66) -or ($_ -eq 67) -or ($_ -eq 68) -or ($_ -eq 69) -or ($_ -eq 70) -or ($_-eq 71)}
-	{
-		$SmpSet = $true
-		Write-LogEntry -Value "The system management password is set" -Severity 1
-	}
-	default
-	{
-		Stop-Script -ErrorMessage "Unable to determine the current password state from value: $($PasswordSettings.PasswordState)"
-	}
+    {$_ -eq 0}
+    {
+        Write-LogEntry -Value "No passwords are currently set" -Severity 1
+    }
+    {($_ -eq 2) -or ($_ -eq 3) -or ($_ -eq 6) -or ($_ -eq 7) -or ($_ -eq 66) -or ($_ -eq 67) -or ($_ -eq 70) -or ($_-eq 71)}
+    {
+        $SvpSet = $true
+        Write-LogEntry -Value "The supervisor password is set" -Severity 1
+    }
+    {($_ -eq 64) -or ($_ -eq 65) -or ($_ -eq 66) -or ($_ -eq 67) -or ($_ -eq 68) -or ($_ -eq 69) -or ($_ -eq 70) -or ($_-eq 71)}
+    {
+        $SmpSet = $true
+        Write-LogEntry -Value "The system management password is set" -Severity 1
+    }
+    {$_ -eq 128}
+    {
+        Write-LogEntry -Value "BIOS certificate-based authentication is in use (PasswordState 128). This script manages password-based authentication only. Use Lenovo's signed-command tooling (such as the Lenovo BIOS Certificate Tool) for certificate-based devices." -Severity 2
+        Write-Output "BIOS certificate-based authentication is in use. No settings actions were taken."
+        Write-LogEntry -Value "END - Lenovo BIOS settings management script" -Severity 1
+        Exit 0
+    }
+    default
+    {
+        Stop-Script -ErrorMessage "Unable to determine the current password state from value: $($PasswordSettings.PasswordState)"
+    }
 }
+
+#Use the opcode interface to authorize changes when it is available and a supervisor or system management password is the authenticator (WmiOpcodePasswordAdmin accepts either)
+$UseOpcodeAuth = ($UseOpcode -and ($SvpSet -or $SmpSet))
 
 #Ensure passwords are set correctly
 if($SetSettings -or $SetDefaults)
@@ -477,9 +604,17 @@ if($SetSettings -or $SetDefaults)
             Stop-Script -ErrorMessage "The supervisor password is set, but no password was supplied. Use the SupervisorPassword parameter when a password is set"
         }
         #Supervisor password set correctly
-        if($PasswordSet.SetBiosPassword("pap,$SupervisorPassword,$SupervisorPassword,ascii,us").Return -eq "Success")
-	    {
-		    Write-LogEntry -Value "The specified supervisor password matches the currently set password" -Severity 1
+        if($UseOpcodeAuth)
+        {
+            $SupervisorCheck = (Invoke-CimMethod -InputObject $OpcodeInterface -MethodName WmiOpcodeInterface -Arguments @{Parameter = "WmiOpcodePasswordAdmin:$SupervisorPassword;"}).Return
+        }
+        else
+        {
+            $SupervisorCheck = (Invoke-CimMethod -InputObject $PasswordSet -MethodName SetBiosPassword -Arguments @{parameter="pap,$SupervisorPassword,$SupervisorPassword,ascii,us"}).Return
+        }
+        if($SupervisorCheck -eq "Success")
+        {
+            Write-LogEntry -Value "The specified supervisor password matches the currently set password" -Severity 1
         }
         #Supervisor password not set correctly
         else
@@ -496,9 +631,17 @@ if($SetSettings -or $SetDefaults)
             Stop-Script -ErrorMessage "The system management password is set, but no password was supplied. Use the SystemManagementPassword parameter when a password is set"
         }
         #System management password set correctly
-        if($PasswordSet.SetBiosPassword("smp,$SystemManagementPassword,$SystemManagementPassword,ascii,us").Return -eq "Success")
-	    {
-		    Write-LogEntry -Value "The specified system management password matches the currently set password" -Severity 1
+        if($UseOpcodeAuth)
+        {
+            $SmpCheck = (Invoke-CimMethod -InputObject $OpcodeInterface -MethodName WmiOpcodeInterface -Arguments @{Parameter = "WmiOpcodePasswordAdmin:$SystemManagementPassword;"}).Return
+        }
+        else
+        {
+            $SmpCheck = (Invoke-CimMethod -InputObject $PasswordSet -MethodName SetBiosPassword -Arguments @{parameter="smp,$SystemManagementPassword,$SystemManagementPassword,ascii,us"}).Return
+        }
+        if($SmpCheck -eq "Success")
+        {
+            Write-LogEntry -Value "The specified system management password matches the currently set password" -Severity 1
         }
         #System management password not set correctly
         else
@@ -511,15 +654,25 @@ if($SetSettings -or $SetDefaults)
 #Get settings
 if($GetSettings)
 {
+    #Connect to the Lenovo_GetBiosSelections WMI class to retrieve the possible values for each setting
+    $BiosSelections = Get-WmiData -Namespace root\wmi -ClassName Lenovo_GetBiosSelections
     $SettingList = $SettingList | Select-Object CurrentSetting | Sort-Object CurrentSetting
     $SettingObject = ForEach($Setting in $SettingList){
-        #Split the current values
-        $SettingSplit = ($Setting.CurrentSetting).Split(',')
+        #Some BIOS versions append extra data after a semicolon, trim it before splitting the name and value
+        $CurrentSetting = $Setting.CurrentSetting
+        if($CurrentSetting -match ';')
+        {
+            $CurrentSetting = $CurrentSetting.Substring(0, $CurrentSetting.IndexOf(';'))
+        }
+        $SettingSplit = $CurrentSetting.Split(',')
         if($SettingSplit[0] -and $SettingSplit[1])
         {
+            #Get the list of possible values for this setting from the Lenovo_GetBiosSelections class
+            $PossibleValue = (Invoke-CimMethod -InputObject $BiosSelections -MethodName GetBiosSelections -Arguments @{Item=$SettingSplit[0]} -ErrorAction SilentlyContinue).Selections
             [PSCustomObject]@{
                 Name = $SettingSplit[0]
                 Value = $SettingSplit[1]
+                PossibleValue = $PossibleValue
             }
         }
     }
@@ -530,7 +683,7 @@ if($GetSettings)
     }
     else
     {
-        Write-Output $SettingObject    
+        Write-Output $SettingObject
     }
 }
 #Set Settings
@@ -619,17 +772,30 @@ if($SetSettings -or $SetDefaults)
 if(($SuccessSet -gt 0) -or ($DefaultSet -eq $True))
 {
     Write-LogEntry -Value "Save the BIOS settings changes" -Severity 1
-    if($SvpSet)
+    if($UseOpcodeAuth)
     {
-        $ReturnCode = ($SaveSettings.SaveBiosSettings("$SupervisorPassword,ascii,us")).Value
+        #Authorize the save via the opcode interface (supervisor password if set, otherwise the system management password), then save without an embedded password
+        if($SvpSet)
+        {
+            [void](Invoke-CimMethod -InputObject $OpcodeInterface -MethodName WmiOpcodeInterface -Arguments @{Parameter = "WmiOpcodePasswordAdmin:$SupervisorPassword;"})
+        }
+        else
+        {
+            [void](Invoke-CimMethod -InputObject $OpcodeInterface -MethodName WmiOpcodeInterface -Arguments @{Parameter = "WmiOpcodePasswordAdmin:$SystemManagementPassword;"})
+        }
+        $ReturnCode = (Invoke-CimMethod -InputObject $SaveSettings -MethodName SaveBiosSettings).Value
+    }
+    elseif($SvpSet)
+    {
+        $ReturnCode = (Invoke-CimMethod -InputObject $SaveSettings -MethodName SaveBiosSettings -Arguments @{parameter="$SupervisorPassword,ascii,us"}).Value
     }
     elseif($SmpSet -and !$SvpSet)
     {
-        $ReturnCode = ($SaveSettings.SaveBiosSettings("$SystemManagementPassword,ascii,us")).Value
+        $ReturnCode = (Invoke-CimMethod -InputObject $SaveSettings -MethodName SaveBiosSettings -Arguments @{parameter="$SystemManagementPassword,ascii,us"}).Value
     }
     else
     {
-        $ReturnCode = ($SaveSettings.SaveBiosSettings()).Value
+        $ReturnCode = (Invoke-CimMethod -InputObject $SaveSettings -MethodName SaveBiosSettings).Value
     }
     if(($null -eq $ReturnCode) -or ($ReturnCode -eq "Success"))
     {
