@@ -310,6 +310,7 @@ Function Set-DellBiosPassword
         }
         else
         {
+            $PasswordSetFail = $true
             Write-LogEntry -Value "The $PasswordType password is currently set to something other than then supplied value, but no old passwords were supplied. Try supplying additional values using the Old$($PasswordType)Password parameter" -Severity 3
         }
     }

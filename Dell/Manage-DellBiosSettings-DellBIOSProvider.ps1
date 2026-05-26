@@ -285,7 +285,7 @@ Function Set-DellBiosSetting
                 {
                     try
                     {
-                        Set-Item -Path DellSmbios:\$SettingPath\$Name -Value $Value
+                        Set-Item -Path DellSmbios:\$SettingPath\$Name -Value $Value -ErrorAction Stop
                     }
                     catch
                     {
@@ -296,7 +296,7 @@ Function Set-DellBiosSetting
                 {
                     try
                     {
-                        Set-Item -Path DellSmbios:\$SettingPath\$Name -Value $Value -Password $Password
+                        Set-Item -Path DellSmbios:\$SettingPath\$Name -Value $Value -Password $Password -ErrorAction Stop
                     }
                     catch
                     {

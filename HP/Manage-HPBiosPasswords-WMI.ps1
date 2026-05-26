@@ -803,8 +803,8 @@ if($PowerOnPasswordCheck -eq 0)
     }
     if($PowerOnSet)
     {
-        #If the setup password is currently set, the setup password is required to set the power on password
-        if(($HPBiosSetting | Where-Object Name -eq "Setup Password").IsSet -eq 1)
+        #If the setup password is currently set, or was just set in this run, the setup password is required to set the power on password
+        if((($HPBiosSetting | Where-Object Name -eq "Setup Password").IsSet -eq 1) -or $SetupSet)
         {
             New-HPBiosPassword -PasswordType PowerOn -Password $PowerOnPassword -SetupPW $SetupPassword
         }
