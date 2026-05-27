@@ -47,11 +47,17 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/hp-bios-settings-management-hpcmsl/
-        Version: 2.3.0
-        Modified: 2026-05-24
+        Version: 2.3.1
+        Modified: 2026-05-26
 
     .CHANGELOG
         See .NOTES Reference for additional detail on each release.
+
+        2.3.1 (2026-05-26)
+            - Fixed BIOS setting value parsing on HP models that return enumeration values with leading whitespace. The asterisk-prefix check that
+              identifies the currently-set value now trims first, so enumeration values on affected models are correctly detected in GetSettings
+              output.
+            - Credit to @CharlesNRU for diagnosing the parsing issue and proposing the fix in PR #11.
 
         2.3.0 (2026-05-24)
             - Added secure password sourcing. New optional SetupPasswordCmsFile parameter sources the setup password from a CMS-encrypted file, decrypted in memory at runtime, so
@@ -102,7 +108,7 @@ param(
 )
 
 #Script version
-$Version = '2.3.0'
+$Version = '2.3.1'
 
 #Log component name
 $Component = 'Manage-HPBiosSettings-HPCMSL'
@@ -475,10 +481,10 @@ if($GetSettings)
     $SettingObject = ForEach($Setting in $SettingList){
         $SetValue = $Setting.Value
         $PossibleValue = ""
-        #Enumeration values are a comma separated list with the currently set value marked by a leading asterisk
+        #Enumeration values are a comma separated list with the currently set value marked by a leading asterisk (some HP models return values with leading whitespace; trim so the asterisk-prefix check works reliably)
         if($SetValue -match '\*')
         {
-            $SettingSplit = $SetValue.Split(',')
+            $SettingSplit = $SetValue.Split(',') | ForEach-Object { $_.Trim() }
             $SplitCount = 0
             while($SplitCount -lt $SettingSplit.Count)
             {

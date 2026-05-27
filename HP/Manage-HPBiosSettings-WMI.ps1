@@ -48,11 +48,18 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/hp-bios-settings-management/
-        Version: 2.3.0
-        Modified: 2026-05-24
+        Version: 2.3.1
+        Modified: 2026-05-26
 
     .CHANGELOG
         See .NOTES Reference for additional detail on each release.
+
+        2.3.1 (2026-05-26)
+            - Fixed BIOS setting value parsing on HP models that return values with leading whitespace. The asterisk-prefix check that identifies
+              the currently-set value now trims first, so settings on affected models are no longer mis-reported as "not found" or unnecessarily
+              re-set. The same fix is applied to HP Sure Admin detection, which could otherwise miss a Sure-Admin-enabled state on affected models.
+            - Filter empty/whitespace-named noise entries that some HP firmware emits in the GetSettings output.
+            - Credit to @CharlesNRU for diagnosing the parsing issue and proposing the fix in PR #11.
 
         2.3.0 (2026-05-24)
             - Added secure password sourcing. New optional SetupPasswordCmsFile parameter sources the setup password from a CMS-encrypted file, decrypted in memory at runtime, so
@@ -112,7 +119,7 @@ param(
 )
 
 #Script version
-$Version = '2.3.0'
+$Version = '2.3.1'
 
 #Log component name
 $Component = 'Manage-HPBiosSettings-WMI'
@@ -284,8 +291,8 @@ Function Set-HPBiosSetting
     $CurrentSetting = $SettingList | Where-Object Name -eq $Name | Select-Object -ExpandProperty Value
     if($NULL -ne $CurrentSetting)
     {
-        #Split the current values
-        $CurrentSettingSplit = $CurrentSetting.Split(',')
+        #Split the current values (some HP models return values with leading whitespace; trim so downstream asterisk-prefix checks work reliably)
+        $CurrentSettingSplit = $CurrentSetting.Split(',') | ForEach-Object { $_.Trim() }
         #Find the currently set value
         $Count = 0
         while($Count -lt $CurrentSettingSplit.Count)
@@ -447,7 +454,7 @@ $SureAdminCurrent = $null
 $SureAdminSetting = ($HPBiosSetting | Where-Object Name -eq "Enhanced BIOS Authentication Mode").Value
 if($SureAdminSetting)
 {
-    foreach($SureAdminValue in $SureAdminSetting.Split(','))
+    foreach($SureAdminValue in ($SureAdminSetting.Split(',') | ForEach-Object { $_.Trim() }))
     {
         if($SureAdminValue.StartsWith('*'))
         {
@@ -521,10 +528,11 @@ if($SetSettings)
 #Get the current settings
 if($GetSettings)
 {
-    $SettingList = $SettingList | Select-Object Name,Value | Sort-Object Name
+    #Filter out entries with no meaningful name (some HP firmware emits noise rows with empty/whitespace names)
+    $SettingList = $SettingList | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Name) } | Select-Object Name,Value | Sort-Object Name
     $SettingObject = ForEach($Setting in $SettingList){
-        #Split the current values
-        $SettingSplit = ($Setting.Value).Split(',')
+        #Split the current values (some HP models return values with leading whitespace; trim so downstream asterisk-prefix checks work reliably)
+        $SettingSplit = ($Setting.Value).Split(',') | ForEach-Object { $_.Trim() }
         #Find the currently set value
         $SplitCount = 0
         while($SplitCount -lt $SettingSplit.Count)

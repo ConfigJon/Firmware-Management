@@ -84,11 +84,17 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/hp-bios-password-management/
-        Version: 2.3.0
-        Modified: 2026-05-24
+        Version: 2.3.1
+        Modified: 2026-05-26
 
     .CHANGELOG
         See .NOTES Reference for additional detail on each release.
+
+        2.3.1 (2026-05-26)
+            - Fixed HP Sure Admin detection on HP models that return BIOS setting values with leading whitespace. The asterisk-prefix check that
+              identifies whether Sure Admin is enabled now trims first, so affected models correctly trigger the clean exit instead of attempting
+              password operations against firmware that requires signed payloads.
+            - Credit to @CharlesNRU for diagnosing the underlying parsing pattern in PR #11.
 
         2.3.0 (2026-05-24)
             - Added secure password sourcing. New optional CmsFile parameters mirror each existing password parameter and source the password from a CMS-encrypted file, decrypted
@@ -159,7 +165,7 @@ param(
 )
 
 #Script version
-$Version = '2.3.0'
+$Version = '2.3.1'
 
 #Log component name
 $Component = 'Manage-HPBiosPasswords-WMI'
@@ -649,7 +655,7 @@ $SureAdminCurrent = $null
 $SureAdminSetting = ($HPBiosSetting | Where-Object Name -eq "Enhanced BIOS Authentication Mode").Value
 if($SureAdminSetting)
 {
-    foreach($SureAdminValue in $SureAdminSetting.Split(','))
+    foreach($SureAdminValue in ($SureAdminSetting.Split(',') | ForEach-Object { $_.Trim() }))
     {
         if($SureAdminValue.StartsWith('*'))
         {
