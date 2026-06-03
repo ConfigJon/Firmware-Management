@@ -383,7 +383,7 @@ Function Test-LenovoBiosPassword
 
 Function Set-LenovoBiosPassword
 {
-    #Set or change a Lenovo BIOS password. The change is authorized by the value supplied in OldPassword (the matching old password, or the supervisor/system management password when managing the power on password). On opcode-capable systems a power on password change cannot be verified before it is made (see Test-LenovoBiosPassword and the WmiOpcodePasswordAdmin session limitation), so the change is submitted and the firmware validates it at the next reboot.
+    #Set or change a Lenovo BIOS password. The change is authorized by the value supplied in OldPassword (the matching old password, or the supervisor/system management password when managing the power on password). On opcode-capable systems a power on or supervisor password change cannot be verified before it is made (see Test-LenovoBiosPassword and the WmiOpcodePasswordAdmin session limitation), so the change is submitted and the firmware validates it at the next reboot. A system management password change is validated synchronously and so is reported definitively.
 
     param(
         [Parameter(Mandatory=$true)][ValidateSet('Supervisor','PowerOn','SystemManagement')]$PasswordType,
@@ -431,9 +431,9 @@ Function Set-LenovoBiosPassword
                     {
                         $TSEnv.Value("LenovoSet$($PasswordType)") = "Success"
                     }
-                    if($PasswordName -eq "pop")
+                    if($PasswordName -eq "pop" -or $PasswordName -eq "pap")
                     {
-                        Write-LogEntry -Value "The $PasswordType password change has been submitted. Lenovo firmware validates power on password changes at the next reboot; if the authorizing password is incorrect the change is rejected with a 0191 error and the password is left unchanged" -Severity 1
+                        Write-LogEntry -Value "The $PasswordType password change has been submitted. Lenovo firmware validates this change at the next reboot; if the authorizing password is incorrect the change is rejected with a 0191 error and the password is left unchanged" -Severity 1
                     }
                     else
                     {
@@ -461,7 +461,7 @@ Function Set-LenovoBiosPassword
 
 Function Clear-LenovoBiosPassword
 {
-    #Clear a Lenovo BIOS password. The clear is authorized by the value supplied in OldPassword (the matching old password, or the supervisor/system management password when clearing the power on password). On opcode-capable systems a power on password clear cannot be verified before it is made, so the clear is submitted and the firmware validates it at the next reboot.
+    #Clear a Lenovo BIOS password. The clear is authorized by the value supplied in OldPassword (the matching old password, or the supervisor/system management password when clearing the power on password). On opcode-capable systems a power on or supervisor password clear cannot be verified before it is made, so the clear is submitted and the firmware validates it at the next reboot. A system management password clear is validated synchronously and so is reported definitively.
 
     param(
         [Parameter(Mandatory=$true)][ValidateSet('Supervisor','PowerOn','SystemManagement')]$PasswordType,
@@ -494,9 +494,9 @@ Function Clear-LenovoBiosPassword
             {
                 $TSEnv.Value("LenovoClear$($PasswordType)") = "Success"
             }
-            if($PasswordName -eq "pop")
+            if($PasswordName -eq "pop" -or $PasswordName -eq "pap")
             {
-                Write-LogEntry -Value "The $PasswordType password clear has been submitted. Lenovo firmware validates power on password changes at the next reboot; if the authorizing password is incorrect the clear is rejected with a 0191 error and the password is left unchanged" -Severity 1
+                Write-LogEntry -Value "The $PasswordType password clear has been submitted. Lenovo firmware validates this change at the next reboot; if the authorizing password is incorrect the clear is rejected with a 0191 error and the password is left unchanged" -Severity 1
             }
             else
             {
@@ -1034,38 +1034,41 @@ if($HdpSet)
         {
             Write-LogEntry -Value "Attempt to clear the existing user and master hard drive passwords" -Severity 1
             $HDDMasterPWClear = "Failed"
-            if((Invoke-LenovoSetPassword -PasswordName "mhdp1" -CurrentPassword $HDDMasterPassword) -eq "Success")
+            $HDDMasterClearResult = Invoke-LenovoSetPassword -PasswordName "mhdp1" -CurrentPassword $HDDMasterPassword
+            if($HDDMasterClearResult -eq "Success")
             {
                 $HDDMasterPWClear = "Success"
                 Write-LogEntry -Value "The master hard drive password has been successfully cleared" -Severity 1
             }
             else
             {
-                Write-LogEntry -Value "Failed to clear the master hard drive password" -Severity 3
+                Write-LogEntry -Value "Failed to clear the master hard drive password (BIOS returned: $HDDMasterClearResult). Hard drive password management over WMI is not supported on all Lenovo models; if this persists with the correct password, clear the hard drive password manually in BIOS Setup" -Severity 3
             }
             $HDDUserPWClear = "Failed"
-            if((Invoke-LenovoSetPassword -PasswordName "uhdp1" -CurrentPassword $HDDUserPassword) -eq "Success")
+            $HDDUserClearResult = Invoke-LenovoSetPassword -PasswordName "uhdp1" -CurrentPassword $HDDUserPassword
+            if($HDDUserClearResult -eq "Success")
             {
                 $HDDUserPWClear = "Success"
                 Write-LogEntry -Value "The user hard drive password has been successfully cleared" -Severity 1
             }
             else
             {
-                Write-LogEntry -Value "Failed to clear the user hard drive password" -Severity 3
+                Write-LogEntry -Value "Failed to clear the user hard drive password (BIOS returned: $HDDUserClearResult). Hard drive password management over WMI is not supported on all Lenovo models; if this persists with the correct password, clear the hard drive password manually in BIOS Setup" -Severity 3
             }
         }
         elseif(($HDDUserPassword) -and !($HDDMasterPassword))
         {
             Write-LogEntry -Value "Attempt to clear the existing user hard drive password" -Severity 1
             $HDDUserPWClear = "Failed"
-            if((Invoke-LenovoSetPassword -PasswordName "uhdp1" -CurrentPassword $HDDUserPassword) -eq "Success")
+            $HDDUserClearResult = Invoke-LenovoSetPassword -PasswordName "uhdp1" -CurrentPassword $HDDUserPassword
+            if($HDDUserClearResult -eq "Success")
             {
                 $HDDUserPWClear = "Success"
                 Write-LogEntry -Value "The user hard drive password has been successfully cleared" -Severity 1
             }
             else
             {
-                Write-LogEntry -Value "Failed to clear the user hard drive password" -Severity 3
+                Write-LogEntry -Value "Failed to clear the user hard drive password (BIOS returned: $HDDUserClearResult). Hard drive password management over WMI is not supported on all Lenovo models; if this persists with the correct password, clear the hard drive password manually in BIOS Setup" -Severity 3
             }
         }
     }
