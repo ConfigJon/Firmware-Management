@@ -120,7 +120,7 @@ param(
     [Parameter(Mandatory=$false)][Switch]$ContinueOnError,
     [Parameter(Mandatory=$false)][Switch]$SMSTSPasswordRetry,
     [Parameter(Mandatory=$false)][ValidateScript({
-            if($_ -notmatch "(\.log)")
+            if($_ -notmatch '\.log$')
             {
                 throw "The file specified in the LogFile paramter must be a .log file"
             }
@@ -450,6 +450,7 @@ Function Write-LogEntry
 if(Get-TaskSequenceStatus)
 {
     $TSEnv = New-Object -COMObject Microsoft.SMS.TSEnvironment
+    $TSProgress = New-Object -ComObject Microsoft.SMS.TsProgressUI
     $LogsDirectory = $TSEnv.Value("_SMSTSLogPath")
 }
 else
