@@ -182,7 +182,7 @@ param(
     [Parameter(Mandatory=$false)][Switch]$ContinueOnError,
     [Parameter(Mandatory=$false)][Switch]$SMSTSPasswordRetry,
     [Parameter(Mandatory=$false)][ValidateScript({
-            if($_ -notmatch "(\.log)")
+            if($_ -notmatch '\.log$')
             {
                 throw "The file specified in the LogFile paramter must be a .log file"
             }

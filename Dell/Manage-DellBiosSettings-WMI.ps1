@@ -105,7 +105,7 @@ param(
     [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$AdminPassword,
     [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String]$AdminPasswordCmsFile,
     [ValidateScript({
-            if($_ -notmatch "(\.csv)")
+            if($_ -notmatch '\.csv$')
             {
                 throw "The specified file must be a .csv file"
             }
@@ -113,7 +113,7 @@ param(
         })]
     [System.IO.FileInfo]$CsvPath,
     [Parameter(Mandatory=$false)][ValidateScript({
-            if($_ -notmatch "(\.log)")
+            if($_ -notmatch '\.log$')
             {
                 throw "The file specified in the LogFile paramter must be a .log file"
             }
