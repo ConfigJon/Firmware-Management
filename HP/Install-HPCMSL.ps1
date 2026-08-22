@@ -410,10 +410,10 @@ function Update-PowerShellGet
     #Re-launch the script in a new session under the same edition so the updated PowerShellGet is loaded
     $HostExe = (Get-Process -Id $PID).Path
     Write-LogEntry -Value "Re-launching the script under $HostExe to pick up the updated PowerShellGet module" -Severity 1
-    $RelaunchArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath, '-Rerun')
+    $RelaunchArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$ScriptPath`"", '-Rerun')
     if ($AllEditions) { $RelaunchArgs += '-AllEditions' }
     if ($Import)      { $RelaunchArgs += '-Import' }
-    if ($LogFile)     { $RelaunchArgs += @('-LogFile', $LogFile) }
+    if ($LogFile)     { $RelaunchArgs += @('-LogFile', "`"$LogFile`"") }
     $RerunProc = Start-Process -FilePath $HostExe -ArgumentList $RelaunchArgs -Wait -PassThru
     exit $RerunProc.ExitCode
 }
@@ -748,9 +748,9 @@ else
                     Write-LogEntry -Value "Detected MSIX-installed PowerShell 7 while running as SYSTEM. MSIX installs are per-user-registered. For reliable -AllEditions support in unattended deployments, install PowerShell 7 via the MSI package." -Severity 1
                 }
                 #Invoke the script so the child host can run its own NuGet/PowerShellGet bootstrap if needed
-                $ChildArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath)
+                $ChildArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$ScriptPath`"")
                 if ($Import)  { $ChildArgs += '-Import' }
-                if ($LogFile) { $ChildArgs += @('-LogFile', $LogFile) }
+                if ($LogFile) { $ChildArgs += @('-LogFile', "`"$LogFile`"") }
                 #Reset PSModulePath for the child to the machine-level registry value before launching
                 $SavedPSModulePath = $env:PSModulePath
                 try
