@@ -420,18 +420,17 @@ function Write-LogEntry
     )
     #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-    #Construct time stamp for log entry
-    if (-not (Test-Path -Path 'variable:global:TimezoneBias'))
+    #Construct time stamp for log entry. CMTrace expresses the timezone bias as the minutes to ADD to local time to reach
+    #UTC, so the sign is the inverse of the .NET offset. The bias is computed fresh on every call: the previous cached form
+    #only flipped the sign on a local copy, so every log line after the first in a run carried the raw, wrong-signed value.
+    [string]$Bias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
+    if ($Bias -match "^-")
     {
-        [string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
-        if ($TimezoneBias -match "^-")
-        {
-            $TimezoneBias = $TimezoneBias.Replace('-', '+')
-        }
-        else
-        {
-            $TimezoneBias = '-' + $TimezoneBias
-        }
+        $TimezoneBias = $Bias.Replace('-', '+')
+    }
+    else
+    {
+        $TimezoneBias = '-' + $Bias
     }
     $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
     #Construct date for log entry
@@ -442,7 +441,7 @@ function Write-LogEntry
     $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Install-DellBiosProvider"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
     try
     {
-        Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
+        Out-File -InputObject $LogText -Append -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
     }
     catch [System.Exception]
     {
