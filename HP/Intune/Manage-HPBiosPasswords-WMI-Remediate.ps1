@@ -185,7 +185,7 @@ function Get-HPSetupPasswordSet
     }
     if ($null -eq $Setting)
     {
-        Write-LogEntry -Value "HP_BIOSSetting query returned no row for Name='Setup Password'" -Severity 2
+        Write-LogEntry -Value "HP_BIOSSetting query returned no row for Name='Setup Password' (provider available but unexpected payload)" -Severity 2
         return $null
     }
     return ([int]$Setting.IsSet -eq 1)

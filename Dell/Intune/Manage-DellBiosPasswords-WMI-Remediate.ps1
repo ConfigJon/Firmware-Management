@@ -155,7 +155,7 @@ function Get-DellAdminPasswordSet
     $Admin = $PasswordObject | Where-Object { $_.NameId -eq 'Admin' } | Select-Object -First 1
     if ($null -eq $Admin)
     {
-        Write-LogEntry -Value "Dell PasswordObject query returned no row for NameId='Admin'" -Severity 2
+        Write-LogEntry -Value "Dell PasswordObject query returned no row for NameId='Admin' (provider available but unexpected payload)" -Severity 2
         return $null
     }
     return ([int]$Admin.IsPasswordSet -eq 1)
