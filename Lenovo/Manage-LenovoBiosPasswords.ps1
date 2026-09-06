@@ -105,11 +105,26 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/lenovo-bios-password-management
-        Version: 2.3.0
-        Modified: 2026-05-25
+        Version: 2.3.1
+        Modified: 2026-09-05
 
     .CHANGELOG
         See .NOTES Reference for additional detail on each release.
+
+        2.3.1 (2026-09-05)
+            - Supervisor password changes and clears on systems using the WMI opcode interface are now reported as submitted for validation at the
+              next reboot, matching the power on password handling. They were previously reported as an immediate success even though the firmware
+              rejects an incorrect authorizing password at the next reboot. System management password operations are still validated synchronously
+              and reported definitively.
+            - Hard drive password clear failures now log the value returned by the BIOS and note that hard drive password management over WMI is not
+              supported on all Lenovo models.
+            - Improved WMI query failure reporting. When a query for a BIOS class fails, each retry warning now includes the error returned, the final
+              failure names the last error, and the script no longer waits 30 seconds after the last attempt.
+            - Fixed the timezone bias written to log entries. Every entry after the first carried the bias with the wrong sign, which shifts those
+              entries' times in viewers that honor it, such as CMTrace. The bias is now computed on every write.
+            - The LogFile parameter now requires the .log extension at the end of the path instead of anywhere in it.
+            - Maintenance: the task sequence detection helper initializes its variables before use so it holds up under strict mode. No behavior
+              change.
 
         2.3.0 (2026-05-25)
             - Added secure password sourcing. New optional CmsFile parameters mirror each existing password parameter and source the password from a CMS-encrypted file, decrypted
@@ -192,7 +207,7 @@ param(
 )
 
 #Script version
-$Version = '2.3.0'
+$Version = '2.3.1'
 
 #Log component name
 $Component = 'Manage-LenovoBiosPasswords'
