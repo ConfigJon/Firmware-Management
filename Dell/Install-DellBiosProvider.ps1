@@ -94,32 +94,32 @@ param(
 
 function Get-TaskSequenceStatus
 {
-    #Determine if a task sequence is currently running
+    #Determine if a task sequence is currently running. The check is two-stage on purpose: creating Microsoft.SMS.TSEnvironment succeeds on any device with the
+    #ConfigMgr client installed, so that alone is a false positive; _SMSTSType is only readable while a task sequence is executing.
+    #The variables are initialized before the try blocks so the function also holds up under strict mode.
+    $TSEnv = $null
     try
     {
-        $TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
+        $TSEnv = New-Object -ComObject 'Microsoft.SMS.TSEnvironment'
     }
-    catch { }
+    catch
+    {
+        return $false
+    }
     if ($null -eq $TSEnv)
     {
         return $false
     }
-    else
+    $TSType = $null
+    try
     {
-        try
-        {
-            $SMSTSType = $TSEnv.Value("_SMSTSType")
-        }
-        catch { }
-        if ([string]::IsNullOrEmpty($SMSTSType))
-        {
-            return $false
-        }
-        else
-        {
-            return $true
-        }
+        $TSType = $TSEnv.Value('_SMSTSType')
     }
+    catch
+    {
+        return $false
+    }
+    return -not [string]::IsNullOrEmpty($TSType)
 }
 
 function Test-WinPE

@@ -143,32 +143,32 @@ $Settings = (
 
 Function Get-TaskSequenceStatus
 {
-    #Determine if a task sequence is currently running
+    #Determine if a task sequence is currently running. The check is two-stage on purpose: creating Microsoft.SMS.TSEnvironment succeeds on any device with the
+    #ConfigMgr client installed, so that alone is a false positive; _SMSTSType is only readable while a task sequence is executing.
+    #The variables are initialized before the try blocks so the function also holds up under strict mode.
+    $TSEnv = $null
     try
     {
-        $TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
+        $TSEnv = New-Object -ComObject 'Microsoft.SMS.TSEnvironment'
     }
-    catch{}
+    catch
+    {
+        return $False
+    }
     if($NULL -eq $TSEnv)
     {
         return $False
     }
-    else
+    $TSType = $null
+    try
     {
-        try
-        {
-            $SMSTSType = $TSEnv.Value("_SMSTSType")
-        }
-        catch{}
-        if([string]::IsNullOrEmpty($SMSTSType))
-        {
-            return $False
-        }
-        else
-        {
-            return $True
-        }
+        $TSType = $TSEnv.Value('_SMSTSType')
     }
+    catch
+    {
+        return $False
+    }
+    return -not [string]::IsNullOrEmpty($TSType)
 }
 
 Function Stop-Script
