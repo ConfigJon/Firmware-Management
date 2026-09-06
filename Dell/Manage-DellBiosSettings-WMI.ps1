@@ -77,7 +77,7 @@
               the password never appears on the command line. The plain-text AdminPassword parameter is unchanged; specifying both is rejected.
 
         2.1.0 (2026-05-23)
-            - Maintenance release — no user-facing changes.
+            - Maintenance release - no user-facing changes.
 
         2.0.0 (2026-05-21)
             - Migrated all WMI access from Get-WmiObject to Get-CimInstance, and the SetAttribute, SetBIOSDefaults, boot order Set, and SecurityInterface.SetNewPassword calls to
