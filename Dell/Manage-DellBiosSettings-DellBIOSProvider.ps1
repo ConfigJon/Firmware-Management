@@ -213,6 +213,32 @@ Function Get-CmsPassword
     return $Result
 }
 
+Function Import-ValidatedCsv
+{
+    #Import a CSV file and fail fast: an empty or header-only file, or a file missing any of the required columns, throws a clear error instead of leaving the caller with nothing to apply.
+    #The path is read literally so file names containing wildcard characters such as [ ] work. Returns the rows as an array.
+
+    param(
+        [Parameter(Mandatory=$true)][String]$Path,
+        [String[]]$RequiredColumns
+    )
+    $Rows = @(Import-Csv -LiteralPath $Path -ErrorAction Stop)
+    if($Rows.Count -eq 0)
+    {
+        throw "No data rows were found in '$Path'. The file may be empty or contain only a header row."
+    }
+    if($RequiredColumns)
+    {
+        $CsvColumns = @($Rows[0].PSObject.Properties.Name)
+        $MissingColumns = @($RequiredColumns | Where-Object {$CsvColumns -notcontains $_})
+        if($MissingColumns.Count -gt 0)
+        {
+            throw "The CSV file '$Path' is missing required column(s): $($MissingColumns -join ', ')"
+        }
+    }
+    return , $Rows
+}
+
 Function Set-DellBiosSetting
 {
     #Set a specific Dell BIOS setting or the boot order
@@ -605,8 +631,14 @@ if($SetSettings -or $SetBootOrder)
 {
     if($CsvPath)
     {
-        Clear-Variable Settings -ErrorAction SilentlyContinue
-        $Settings = Import-Csv -Path $CsvPath
+        try
+        {
+            $Settings = Import-ValidatedCsv -Path $CsvPath -RequiredColumns @('Name','Value')
+        }
+        catch
+        {
+            Stop-Script -ErrorMessage "Failed to import BIOS settings from the CSV file: $CsvPath" -Exception $_.Exception.Message
+        }
     }
     #Set Dell BIOS settings - password is set
     if($AdminPasswordCheck -eq "True")
