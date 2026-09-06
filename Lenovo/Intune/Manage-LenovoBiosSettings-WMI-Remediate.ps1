@@ -417,7 +417,7 @@ function Format-DriftNames
 
     param(
         [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Names,
-        [Parameter(Mandatory = $false)][int]$MaxLength = 1500
+        [ValidateRange(8, [int]::MaxValue)][int]$MaxLength = 1500
     )
     if ($Names.Count -eq 0) { return '' }
     $List = $Names -join ','
@@ -428,6 +428,12 @@ function Format-DriftNames
         $Candidate = if ($Acc -eq '') { $N } else { "$Acc,$N" }
         if (($Candidate + ',+more').Length -gt $MaxLength) { break }
         $Acc = $Candidate
+    }
+    if ($Acc -eq '')
+    {
+        #Even the first name exceeds the budget: keep as much of it as fits so the output still names at least one offender.
+        $Keep = [Math]::Min($Names[0].Length, $MaxLength - ',+more'.Length)
+        $Acc = $Names[0].Substring(0, $Keep)
     }
     return "$Acc,+more"
 }
