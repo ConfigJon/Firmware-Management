@@ -137,10 +137,11 @@ function Stop-Script
 
 function Get-ModuleInstallPaths
 {
-    #Return the module install root path
+    #Return the AllUsers module install root for the running edition, or both editions' roots with -AllEditions. Always returns an array: the single-element
+    #branch needs the leading comma or PowerShell unrolls it to a bare string, which then indexes by character instead of by path.
 
     param(
-        [Parameter(Mandatory = $false)][switch]$AllEditions
+        [switch]$AllEditions
     )
     if ($AllEditions)
     {
@@ -150,7 +151,7 @@ function Get-ModuleInstallPaths
         )
     }
     $Subpath = if ($PSVersionTable.PSEdition -eq 'Core') { 'PowerShell\Modules' } else { 'WindowsPowerShell\Modules' }
-    return @((Join-Path $env:ProgramFiles $Subpath))
+    return , @((Join-Path $env:ProgramFiles $Subpath))
 }
 
 function Find-PwshExe
