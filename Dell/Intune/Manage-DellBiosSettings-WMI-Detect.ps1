@@ -27,8 +27,8 @@
 
     .NOTES
         Created by: Jon Anderson
-        Version: 1.0.0
-        Modified: 2026-06-06
+        Version: 1.0.1
+        Modified: 2026-09-06
 #>
 
 #Parameters ===================================================================================================================
@@ -76,7 +76,7 @@ param(
     [switch]$SkipManufacturerCheck
 )
 
-$Version = '1.0.0'
+$Version = '1.0.1'
 $Component = 'Manage-DellBiosSettings-WMI-Detect'
 
 #Desired state ===============================================================================================================

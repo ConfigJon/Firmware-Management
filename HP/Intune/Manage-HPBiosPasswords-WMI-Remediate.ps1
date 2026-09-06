@@ -23,8 +23,8 @@
 
     .NOTES
         Created by: Jon Anderson
-        Version: 1.0.0
-        Modified: 2026-06-06
+        Version: 1.0.1
+        Modified: 2026-09-06
 #>
 
 #CimCmdlets is required up front instead of being loaded by the first CIM call: the module's alias definitions honor
@@ -58,7 +58,7 @@ param(
     [switch]$SkipManufacturerCheck
 )
 
-$Version = '1.0.0'
+$Version = '1.0.1'
 $Component = 'Manage-HPBiosPasswords-WMI-Remediate'
 
 #Payload =====================================================================================================================
