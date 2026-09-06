@@ -200,6 +200,11 @@ function Get-CmsPlaintextFromPayload
         [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][System.Collections.IDictionary]$Payload,
         [Parameter(Mandatory = $true)][ValidateRange(1, [int]::MaxValue)][int]$Version
     )
+    if ($null -eq $Payload['Files'])
+    {
+        #Name a missing Files table instead of failing on a null method call.
+        throw 'Payload has no Files table (payload not built into this script?)'
+    }
     $Key = "$Version"
     if (-not $Payload.Files.Contains($Key))
     {
@@ -218,7 +223,7 @@ function Get-CmsPlaintextFromPayload
     }
     catch
     {
-        throw "Failed to decrypt CMS for version $Version (cert thumbprint $($Payload.CertThumbprint) likely missing or no private key): $($_.Exception.Message)"
+        throw "Failed to decrypt CMS for version $Version (cert thumbprint $($Payload['CertThumbprint']) likely missing or no private key): $($_.Exception.Message)"
     }
     return $Plaintext
 }
