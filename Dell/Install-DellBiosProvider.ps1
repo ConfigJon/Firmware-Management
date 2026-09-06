@@ -29,7 +29,7 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/working-with-the-dell-command-powershell-provider/
-        Modified: 2026-05-20
+        Modified: 2026-09-06
 
     .CHANGELOG
         2020-09-07 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Dell.
@@ -48,6 +48,13 @@
                      -Module can still be imported via optional -Import swtich
                      Normalized formatting and style throughout the script
                      Several smaller bug fixes and improvements
+        2026-09-06 - Fixed the timezone bias written to log entries. Every entry after the first carried the bias with the wrong sign, which shifts
+                     those entries' times in viewers that honor it, such as CMTrace. The bias is now computed on every write
+                     Gated the NuGet/PowerShellGet bootstrap to Windows PowerShell 5.1, matching the HP installer. Under PowerShell 7 NuGet and
+                     PowerShellGet are already current
+                     Module version decisions now compare as versions rather than strings, so a newer installed DellBIOSProvider version is kept
+                     instead of being downgraded when the local source or the gallery offers an older one
+                     The task sequence detection helper initializes its variables before use so it holds up under strict mode. No behavior change
 
 #>
 
