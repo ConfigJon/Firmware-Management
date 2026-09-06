@@ -34,6 +34,10 @@
         Modified: 2026-06-06
 #>
 
+#CimCmdlets is required up front instead of being loaded by the first CIM call: the module's alias definitions honor
+#$WhatIfPreference, so a lazy load during a -WhatIf run prints a dozen "What if: ... Set Alias" lines into the preview.
+#Requires -Modules CimCmdlets
+
 #Parameters ===================================================================================================================
 
 [CmdletBinding(SupportsShouldProcess = $true, PositionalBinding = $false)]
