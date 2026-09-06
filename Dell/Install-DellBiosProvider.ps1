@@ -618,9 +618,14 @@ if ($ModulePath)
     }
     if (($null -ne $SourceVersion) -and ($null -ne $LocalVersion))
     {
-        if ($SourceVersion -eq $LocalVersion)
+        $Cmp = ([Version]$SourceVersion).CompareTo([Version]$LocalVersion)
+        if ($Cmp -eq 0)
         {
             Write-LogEntry -Value "The latest version of the DellBIOSProvider module is already installed" -Severity 1
+        }
+        elseif ($Cmp -lt 0)
+        {
+            Write-LogEntry -Value "A newer version of the DellBIOSProvider module is already installed" -Severity 1
         }
         else
         {
@@ -655,10 +660,18 @@ else
     #Bootstrap NuGet + PowerShellGet so a stock Windows PowerShell 5.1 image can reach the gallery
     if (-not $Rerun)
     {
-        Write-LogEntry -Value "Checking the version of the NuGet package provider" -Severity 1
-        Update-NuGet
-        Write-LogEntry -Value "Checking the version of the PowerShellGet module" -Severity 1
-        Update-PowerShellGet
+        #Skip the update for PowerShell 7
+        if ($PSVersionTable.PSEdition -eq 'Core')
+        {
+            Write-LogEntry -Value "Skipping NuGet/PowerShellGet bootstrap under PowerShell 7 (current versions ship in-box)" -Severity 1
+        }
+        else
+        {
+            Write-LogEntry -Value "Checking the version of the NuGet package provider" -Severity 1
+            Update-NuGet
+            Write-LogEntry -Value "Checking the version of the PowerShellGet module" -Severity 1
+            Update-PowerShellGet
+        }
     }
 
     #Get the version of the DellBIOSProvider module in the PowerShell Gallery
@@ -689,9 +702,14 @@ else
     }
     elseif ($null -ne $LocalVersion)
     {
-        if ($WebVersion -eq $LocalVersion)
+        $Cmp = ([Version]$WebVersion).CompareTo([Version]$LocalVersion)
+        if ($Cmp -eq 0)
         {
             Write-LogEntry -Value "The latest version of the DellBIOSProvider module is already installed" -Severity 1
+        }
+        elseif ($Cmp -lt 0)
+        {
+            Write-LogEntry -Value "A newer version of the DellBIOSProvider module is already installed" -Severity 1
         }
         else
         {
