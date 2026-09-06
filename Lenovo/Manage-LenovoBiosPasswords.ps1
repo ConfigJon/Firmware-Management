@@ -275,7 +275,9 @@ Function Get-CmsPassword
 
 Function Get-WmiData
 {
-    #Gets WMI data using the CIM cmdlets and stores the data in a variable
+    #Gets WMI data using the CIM cmdlets and stores the data in a variable. The query is retried because vendor BIOS
+    #providers can register minutes after boot. The reason for each failure is kept and logged, so a missing provider,
+    #a class the model does not expose, an access problem, or a class with no instances can be told apart from the log
 
     param(
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
@@ -283,46 +285,45 @@ Function Get-WmiData
         [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
     )
     $Counter = 0
+    $LastError = $null
     while($Counter -lt 6)
     {
-        if($Select)
-        {
-            Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-            $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
-        }
-        else
-        {
-            Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-            $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue
-        }
-        if($null -eq $Query)
+        $Query = $null
+        $AttemptError = $null
+        try
         {
             if($Select)
             {
-                Write-LogEntry -Value "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
+                Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
+                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop | Select-Object $Select
             }
             else
             {
-                Write-LogEntry -Value "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
+                Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
+                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop
             }
-            Start-Sleep -Seconds 30
-            $Counter++
         }
-        else
+        catch
+        {
+            $AttemptError = $_.Exception.Message.Trim()
+            $LastError = $AttemptError
+        }
+        if($null -ne $Query)
         {
             break
+        }
+        $Counter++
+        if($Counter -lt 6)
+        {
+            $Reason = if($AttemptError) { "Error: $AttemptError" } else { "The query returned no instances" }
+            Write-LogEntry -Value "Unable to get the $ClassName WMI class from the $Namespace namespace. $Reason. Retry in 30 seconds" -Severity 2
+            Start-Sleep -Seconds 30
         }
     }
     if($null -eq $Query)
     {
-        if($Select)
-        {
-            Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace"
-        }
-        else
-        {
-            Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace"
-        }
+        $Reason = if($LastError) { "Last error: $LastError" } else { "The query returned no instances" }
+        Stop-Script -ErrorMessage "Unable to get the $ClassName WMI class from the $Namespace namespace after 6 attempts. $Reason"
     }
     Write-LogEntry -Value "Successfully connected to the $ClassName WMI class" -Severity 1
     return $Query
