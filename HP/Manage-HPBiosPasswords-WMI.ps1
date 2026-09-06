@@ -84,11 +84,20 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/hp-bios-password-management/
-        Version: 2.3.1
-        Modified: 2026-05-26
+        Version: 2.3.2
+        Modified: 2026-09-05
 
     .CHANGELOG
         See .NOTES Reference for additional detail on each release.
+
+        2.3.2 (2026-09-05)
+            - Improved WMI query failure reporting. When a query for a BIOS class fails, each retry warning now includes the error returned, the final
+              failure names the last error, and the script no longer waits 30 seconds after the last attempt.
+            - Fixed the timezone bias written to log entries. Every entry after the first carried the bias with the wrong sign, which shifts those
+              entries' times in viewers that honor it, such as CMTrace. The bias is now computed on every write.
+            - The LogFile parameter now requires the .log extension at the end of the path instead of anywhere in it.
+            - Maintenance: the task sequence detection helper initializes its variables before use so it holds up under strict mode. No behavior
+              change.
 
         2.3.1 (2026-05-26)
             - Fixed HP Sure Admin detection on HP models that return BIOS setting values with leading whitespace. The asterisk-prefix check that
@@ -165,7 +174,7 @@ param(
 )
 
 #Script version
-$Version = '2.3.1'
+$Version = '2.3.2'
 
 #Log component name
 $Component = 'Manage-HPBiosPasswords-WMI'

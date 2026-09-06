@@ -47,11 +47,20 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/hp-bios-settings-management-hpcmsl/
-        Version: 2.3.1
-        Modified: 2026-05-26
+        Version: 2.3.2
+        Modified: 2026-09-05
 
     .CHANGELOG
         See .NOTES Reference for additional detail on each release.
+
+        2.3.2 (2026-09-05)
+            - A missing, empty, or mis-headed CSV file passed to CsvPath now stops the script with a logged error instead of applying nothing. The
+              path is read literally, so file names containing brackets work.
+            - Fixed the timezone bias written to log entries. Every entry after the first carried the bias with the wrong sign, which shifts those
+              entries' times in viewers that honor it, such as CMTrace. The bias is now computed on every write.
+            - The LogFile and CsvPath parameters now require their .log and .csv extensions at the end of the path instead of anywhere in it.
+            - Maintenance: the task sequence detection helper initializes its variables before use so it holds up under strict mode. No behavior
+              change.
 
         2.3.1 (2026-05-26)
             - Fixed BIOS setting value parsing on HP models that return enumeration values with leading whitespace. The asterisk-prefix check that
@@ -108,7 +117,7 @@ param(
 )
 
 #Script version
-$Version = '2.3.1'
+$Version = '2.3.2'
 
 #Log component name
 $Component = 'Manage-HPBiosSettings-HPCMSL'
