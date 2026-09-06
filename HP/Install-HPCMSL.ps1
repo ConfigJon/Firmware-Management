@@ -31,7 +31,7 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/installing-the-hp-client-management-script-library
-        Modified: 2026-05-18
+        Modified: 2026-09-06
 
     .CHANGELOG
         2020-09-14 - Added a LogFile parameter. Changed the default log path in full Windows to $env:ProgramData\ConfigJonScripts\HP.
@@ -50,6 +50,13 @@
                      The rerun launched by Update-PowerShellGet now uses the running host's executable instead of hard-coding powershell.exe
                      Normalized formatting and style throughout the script
                      Several smaller bug fixes and improvements
+        2026-09-06 - Fixed the timezone bias written to log entries. Every entry after the first carried the bias with the wrong sign, which shifts
+                     those entries' times in viewers that honor it, such as CMTrace. The bias is now computed on every write
+                     Quoted the script and log file paths passed to the PowerShellGet rerun and to the other-edition child process, so paths
+                     containing spaces no longer split into separate arguments
+                     Get-ModuleInstallPaths now returns an array in every branch. The default branch returned a bare string; the script's only caller
+                     already wrapped the result, so there is no behavior change
+                     The task sequence detection helper initializes its variables before use so it holds up under strict mode. No behavior change
 #>
 
 #Parameters ===================================================================================================================
