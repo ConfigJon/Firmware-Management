@@ -82,7 +82,7 @@ $Component = 'Manage-LenovoBiosSettings-WMI-Remediate'
 #Desired state ===============================================================================================================
 #Edit this hashtable to match your desired Lenovo BIOS configuration.
 #Names match the first comma-delimited field of Lenovo_BiosSetting.CurrentSetting exactly.
-#Values match the parsed CurrentSetting value exactly. ('Enable' / 'Disable' / 'Auto').
+#Values match the parsed CurrentSetting value exactly. ('Enable' / 'Disable' / 'Auto' / 'Yes').
 #Use the existing Manage-LenovoBiosSettings.ps1 GetSettings mode to list what the device exposes.
 
 $DesiredSettings = @{
@@ -91,6 +91,13 @@ $DesiredSettings = @{
     # 'VirtualizationTechnology'      = 'Enable'
     # 'FingerprintReader'             = 'Enable'
     # 'PasswordCountExceededError'    = 'Disable'
+}
+
+#Desktop-specific desired state. Used when Win32_ComputerSystem.PCSystemType -ne 2.
+#Same rules as $DesiredSettings: names/values must match Lenovo_BiosSetting.CurrentSetting exactly.
+
+$DesiredSettingsDesktop = @{
+    # 'BIOSPasswordAtBootDeviceList'  = 'Yes'
 }
 
 #Payload =====================================================================================================================
@@ -959,6 +966,29 @@ if (-not $SkipManufacturerCheck)
         Write-LogEntry -Value "Manufacturer = '$Manufacturer' - Lenovo hardware confirmed, proceeding" -Severity 1
     }
 }
+
+#Form factor detection. PCSystemType 2 = Mobile (laptop); anything else is treated as a desktop.
+try
+{
+    $IsDesktop = ((Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop).PCSystemType -ne 2)
+}
+catch
+{
+    $IsDesktop = $false
+    Write-LogEntry -Value "PCSystemType query failed: $($_.Exception.Message) - defaulting to laptop desired state" -Severity 2
+}
+
+if ($IsDesktop)
+{
+    $DesiredSettings = $DesiredSettingsDesktop
+    Write-LogEntry -Value 'Form factor: Desktop - applying $DesiredSettingsDesktop' -Severity 1
+}
+else
+{
+    Write-LogEntry -Value 'Form factor: Laptop/Mobile - applying $DesiredSettings' -Severity 1
+}
+
+Write-LogEntry -Value "Managed settings count: $($DesiredSettings.Count)" -Severity 1
 
 #DesiredSettings check.
 if ($DesiredSettings.Count -eq 0)
