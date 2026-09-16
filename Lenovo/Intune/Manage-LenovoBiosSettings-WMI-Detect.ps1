@@ -87,12 +87,14 @@ $Component = 'Manage-LenovoBiosSettings-WMI-Detect'
 #Use the existing Manage-LenovoBiosSettings.ps1 GetSettings mode to list what the device exposes.
 
 $DesiredSettings = @{
-    # Examples - replace with the settings your devices should standardize on:
-    # 'WakeOnLAN'                     = 'AutomaticEnable'
-    # 'VirtualizationTechnology'      = 'Enable'
-    # 'BootOrder'                     = ''                   # complex value - prefer string match
-    # 'FingerprintReader'             = 'Enable'
-    # 'PasswordCountExceededError'    = 'Disable'
+    'BIOSPasswordAtBootDeviceList' = 'Enable'
+}
+
+#Desktop-specific desired state. Used when Win32_ComputerSystem.PCSystemType -ne 2.
+#Same rules as $DesiredSettings: names/values must match Lenovo_BiosSetting.CurrentSetting exactly.
+
+$DesiredSettingsDesktop = @{
+    'BIOSPasswordAtBootDeviceList'  = 'Yes'
 }
 
 #Reporting (Log Analytics) ===================================================================================================
@@ -832,7 +834,7 @@ elseif (-not (Test-Path -PathType Container $LogsDirectory))
 
 Write-LogEntry -Value "START - Lenovo BIOS settings detection (Intune) v$Version" -Severity 1
 Write-LogEntry -Value "Profile=$Profile  MarkerBasePath=$MarkerBasePath  PwMarkerPath=$PwMarkerPath  RetryFailedAfterDays=$RetryFailedAfterDays  NoPassword=$NoPassword  Reporting=$ReportingEnabled" -Severity 1
-Write-LogEntry -Value "Managed settings count: $($DesiredSettings.Count)" -Severity 1
+
 
 #Manufacturer check.
 if (-not $SkipManufacturerCheck)
@@ -862,6 +864,29 @@ if (-not $SkipManufacturerCheck)
         Write-LogEntry -Value "Manufacturer = '$Manufacturer' - Lenovo hardware confirmed, proceeding" -Severity 1
     }
 }
+
+#Form factor detection. PCSystemType 2 = Mobile (laptop); anything else is treated as a desktop.
+try
+{
+    $IsDesktop = ((Get-CimInstance -ClassName Win32_ComputerSystem -ErrorAction Stop).PCSystemType -ne 2)
+}
+catch
+{
+    $IsDesktop = $false
+    Write-LogEntry -Value "PCSystemType query failed: $($_.Exception.Message) - defaulting to laptop desired state" -Severity 2
+}
+
+if ($IsDesktop)
+{
+    $DesiredSettings = $DesiredSettingsDesktop
+    Write-LogEntry -Value 'Form factor: Desktop - applying $DesiredSettingsDesktop' -Severity 1
+}
+else
+{
+    Write-LogEntry -Value 'Form factor: Laptop/Mobile - applying $DesiredSettings' -Severity 1
+}
+
+Write-LogEntry -Value "Managed settings count: $($DesiredSettings.Count)" -Severity 1
 
 #DesiredSettings check.
 if ($DesiredSettings.Count -eq 0)
