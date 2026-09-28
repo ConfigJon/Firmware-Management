@@ -84,11 +84,20 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/hp-bios-password-management/
-        Version: 2.3.1
-        Modified: 2026-05-26
+        Version: 2.3.2
+        Modified: 2026-09-05
 
     .CHANGELOG
         See .NOTES Reference for additional detail on each release.
+
+        2.3.2 (2026-09-05)
+            - Improved WMI query failure reporting. When a query for a BIOS class fails, each retry warning now includes the error returned, the final
+              failure names the last error, and the script no longer waits 30 seconds after the last attempt.
+            - Fixed the timezone bias written to log entries. Every entry after the first carried the bias with the wrong sign, which shifts those
+              entries' times in viewers that honor it, such as CMTrace. The bias is now computed on every write.
+            - The LogFile parameter now requires the .log extension at the end of the path instead of anywhere in it.
+            - Maintenance: the task sequence detection helper initializes its variables before use so it holds up under strict mode. No behavior
+              change.
 
         2.3.1 (2026-05-26)
             - Fixed HP Sure Admin detection on HP models that return BIOS setting values with leading whitespace. The asterisk-prefix check that
@@ -165,7 +174,7 @@ param(
 )
 
 #Script version
-$Version = '2.3.1'
+$Version = '2.3.2'
 
 #Log component name
 $Component = 'Manage-HPBiosPasswords-WMI'
@@ -174,32 +183,32 @@ $Component = 'Manage-HPBiosPasswords-WMI'
 
 Function Get-TaskSequenceStatus
 {
-    #Determine if a task sequence is currently running
+    #Determine if a task sequence is currently running. The check is two-stage on purpose: creating Microsoft.SMS.TSEnvironment succeeds on any device with the
+    #ConfigMgr client installed, so that alone is a false positive; _SMSTSType is only readable while a task sequence is executing.
+    #The variables are initialized before the try blocks so the function also holds up under strict mode.
+    $TSEnv = $null
     try
     {
-        $TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
+        $TSEnv = New-Object -ComObject 'Microsoft.SMS.TSEnvironment'
     }
-    catch{}
+    catch
+    {
+        return $False
+    }
     if($NULL -eq $TSEnv)
     {
         return $False
     }
-    else
+    $TSType = $null
+    try
     {
-        try
-        {
-            $SMSTSType = $TSEnv.Value("_SMSTSType")
-        }
-        catch{}
-        if([string]::IsNullOrEmpty($SMSTSType))
-        {
-            return $False
-        }
-        else
-        {
-            return $True
-        }
+        $TSType = $TSEnv.Value('_SMSTSType')
     }
+    catch
+    {
+        return $False
+    }
+    return -not [string]::IsNullOrEmpty($TSType)
 }
 
 Function Stop-Script
@@ -248,7 +257,9 @@ Function Get-CmsPassword
 
 Function Get-WmiData
 {
-    #Gets WMI data using the CIM cmdlets and stores the data in a variable
+    #Gets WMI data using the CIM cmdlets and stores the data in a variable. The query is retried because vendor BIOS
+    #providers can register minutes after boot. The reason for each failure is kept and logged, so a missing provider,
+    #a class the model does not expose, an access problem, or a class with no instances can be told apart from the log
 
     param(
         [Parameter(Mandatory=$true)][ValidateNotNullOrEmpty()][String]$Namespace,
@@ -256,46 +267,45 @@ Function Get-WmiData
         [Parameter(Mandatory=$false)][ValidateNotNullOrEmpty()][String[]]$Select
     )
     $Counter = 0
+    $LastError = $null
     while($Counter -lt 6)
     {
-        if($Select)
-        {
-            Write-LogEntry -Value "Get the $Classname WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
-            $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue | Select-Object $Select -ErrorAction SilentlyContinue
-        }
-        else
-        {
-            Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
-            $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction SilentlyContinue
-        }
-        if($null -eq $Query)
+        $Query = $null
+        $AttemptError = $null
+        try
         {
             if($Select)
             {
-                Write-LogEntry -Value "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
+                Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace and select properties: $Select" -Severity 1
+                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop | Select-Object $Select
             }
             else
             {
-                Write-LogEntry -Value "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace. Retry in 30 seconds" -Severity 2
+                Write-LogEntry -Value "Get the $ClassName WMI class from the $Namespace namespace" -Severity 1
+                $Query = Get-CimInstance -Namespace $Namespace -ClassName $ClassName -ErrorAction Stop
             }
-            Start-Sleep -Seconds 30
-            $Counter++
         }
-        else
+        catch
+        {
+            $AttemptError = $_.Exception.Message.Trim()
+            $LastError = $AttemptError
+        }
+        if($null -ne $Query)
         {
             break
+        }
+        $Counter++
+        if($Counter -lt 6)
+        {
+            $Reason = if($AttemptError) { "Error: $AttemptError" } else { "The query returned no instances" }
+            Write-LogEntry -Value "Unable to get the $ClassName WMI class from the $Namespace namespace. $Reason. Retry in 30 seconds" -Severity 2
+            Start-Sleep -Seconds 30
         }
     }
     if($null -eq $Query)
     {
-        if($Select)
-        {
-            Stop-Script -ErrorMessage "An error occurred while attempting to get the $Select properties from the $Classname WMI class in the $Namespace namespace"
-        }
-        else
-        {
-            Stop-Script -ErrorMessage "An error occurred while connecting to the $Classname WMI class in the $Namespace namespace"
-        }
+        $Reason = if($LastError) { "Last error: $LastError" } else { "The query returned no instances" }
+        Stop-Script -ErrorMessage "Unable to get the $ClassName WMI class from the $Namespace namespace after 6 attempts. $Reason"
     }
     Write-LogEntry -Value "Successfully connected to the $ClassName WMI class" -Severity 1
     return $Query
@@ -541,18 +551,17 @@ Function Write-LogEntry
     )
     #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-    #Construct time stamp for log entry
-    if(-not(Test-Path -Path 'variable:global:TimezoneBias'))
+    #Construct time stamp for log entry. CMTrace expresses the timezone bias as the minutes to ADD to local time to reach
+    #UTC, so the sign is the inverse of the .NET offset. The bias is computed fresh on every call: the previous cached form
+    #only flipped the sign on a local copy, so every log line after the first in a run carried the raw, wrong-signed value.
+    [string]$Bias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
+    if($Bias -match "^-")
     {
-        [string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
-        if($TimezoneBias -match "^-")
-        {
-            $TimezoneBias = $TimezoneBias.Replace('-', '+')
-        }
-        else
-        {
-            $TimezoneBias = '-' + $TimezoneBias
-        }
+        $TimezoneBias = $Bias.Replace('-', '+')
+    }
+    else
+    {
+        $TimezoneBias = '-' + $Bias
     }
     $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
     #Construct date for log entry
@@ -564,7 +573,7 @@ Function Write-LogEntry
     #Add value to log file
     try
     {
-        Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
+        Out-File -InputObject $LogText -Append -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
     }
     catch [System.Exception]
     {

@@ -23,9 +23,13 @@
 
     .NOTES
         Created by: Jon Anderson
-        Version: 1.0.0
-        Modified: 2026-06-06
+        Version: 1.0.1
+        Modified: 2026-09-06
 #>
+
+#CimCmdlets is required up front instead of being loaded by the first CIM call: the module's alias definitions honor
+#$WhatIfPreference, so a lazy load during a -WhatIf run prints a dozen "What if: ... Set Alias" lines into the preview.
+#Requires -Modules CimCmdlets
 
 #Parameters ===================================================================================================================
 
@@ -54,7 +58,7 @@ param(
     [switch]$SkipManufacturerCheck
 )
 
-$Version = '1.0.0'
+$Version = '1.0.1'
 $Component = 'Manage-HPBiosPasswords-WMI-Remediate'
 
 #Payload =====================================================================================================================
@@ -181,7 +185,7 @@ function Get-HPSetupPasswordSet
     }
     if ($null -eq $Setting)
     {
-        Write-LogEntry -Value "HP_BIOSSetting query returned no row for Name='Setup Password'" -Severity 2
+        Write-LogEntry -Value "HP_BIOSSetting query returned no row for Name='Setup Password' (provider available but unexpected payload)" -Severity 2
         return $null
     }
     return ([int]$Setting.IsSet -eq 1)
@@ -217,6 +221,11 @@ function Get-CmsPlaintextFromPayload
         [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()][System.Collections.IDictionary]$Payload,
         [Parameter(Mandatory = $true)][ValidateRange(1, [int]::MaxValue)][int]$Version
     )
+    if ($null -eq $Payload['Files'])
+    {
+        #Name a missing Files table instead of failing on a null method call.
+        throw 'Payload has no Files table (payload not built into this script?)'
+    }
     $Key = "$Version"
     if (-not $Payload.Files.Contains($Key))
     {
@@ -235,7 +244,7 @@ function Get-CmsPlaintextFromPayload
     }
     catch
     {
-        throw "Failed to decrypt CMS for version $Version (cert thumbprint $($Payload.CertThumbprint) likely missing or no private key): $($_.Exception.Message)"
+        throw "Failed to decrypt CMS for version $Version (cert thumbprint $($Payload['CertThumbprint']) likely missing or no private key): $($_.Exception.Message)"
     }
     return $Plaintext
 }

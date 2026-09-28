@@ -31,7 +31,7 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/installing-the-hp-client-management-script-library
-        Modified: 2026-05-18
+        Modified: 2026-09-06
 
     .CHANGELOG
         2020-09-14 - Added a LogFile parameter. Changed the default log path in full Windows to $env:ProgramData\ConfigJonScripts\HP.
@@ -50,6 +50,13 @@
                      The rerun launched by Update-PowerShellGet now uses the running host's executable instead of hard-coding powershell.exe
                      Normalized formatting and style throughout the script
                      Several smaller bug fixes and improvements
+        2026-09-06 - Fixed the timezone bias written to log entries. Every entry after the first carried the bias with the wrong sign, which shifts
+                     those entries' times in viewers that honor it, such as CMTrace. The bias is now computed on every write
+                     Quoted the script and log file paths passed to the PowerShellGet rerun and to the other-edition child process, so paths
+                     containing spaces no longer split into separate arguments
+                     Get-ModuleInstallPaths now returns an array in every branch. The default branch returned a bare string; the script's only caller
+                     already wrapped the result, so there is no behavior change
+                     The task sequence detection helper initializes its variables before use so it holds up under strict mode. No behavior change
 #>
 
 #Parameters ===================================================================================================================
@@ -84,32 +91,32 @@ param(
 
 function Get-TaskSequenceStatus
 {
-    #Determine if a task sequence is currently running
+    #Determine if a task sequence is currently running. The check is two-stage on purpose: creating Microsoft.SMS.TSEnvironment succeeds on any device with the
+    #ConfigMgr client installed, so that alone is a false positive; _SMSTSType is only readable while a task sequence is executing.
+    #The variables are initialized before the try blocks so the function also holds up under strict mode.
+    $TSEnv = $null
     try
     {
-        $TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
+        $TSEnv = New-Object -ComObject 'Microsoft.SMS.TSEnvironment'
     }
-    catch { }
+    catch
+    {
+        return $false
+    }
     if ($null -eq $TSEnv)
     {
         return $false
     }
-    else
+    $TSType = $null
+    try
     {
-        try
-        {
-            $SMSTSType = $TSEnv.Value("_SMSTSType")
-        }
-        catch { }
-        if ([string]::IsNullOrEmpty($SMSTSType))
-        {
-            return $false
-        }
-        else
-        {
-            return $true
-        }
+        $TSType = $TSEnv.Value('_SMSTSType')
     }
+    catch
+    {
+        return $false
+    }
+    return -not [string]::IsNullOrEmpty($TSType)
 }
 
 function Test-WinPE
@@ -137,10 +144,11 @@ function Stop-Script
 
 function Get-ModuleInstallPaths
 {
-    #Return the module install root path
+    #Return the AllUsers module install root for the running edition, or both editions' roots with -AllEditions. Always returns an array: the single-element
+    #branch needs the leading comma or PowerShell unrolls it to a bare string, which then indexes by character instead of by path.
 
     param(
-        [Parameter(Mandatory = $false)][switch]$AllEditions
+        [switch]$AllEditions
     )
     if ($AllEditions)
     {
@@ -150,7 +158,7 @@ function Get-ModuleInstallPaths
         )
     }
     $Subpath = if ($PSVersionTable.PSEdition -eq 'Core') { 'PowerShell\Modules' } else { 'WindowsPowerShell\Modules' }
-    return @((Join-Path $env:ProgramFiles $Subpath))
+    return , @((Join-Path $env:ProgramFiles $Subpath))
 }
 
 function Find-PwshExe
@@ -436,18 +444,17 @@ function Write-LogEntry
     )
     #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-    #Construct time stamp for log entry
-    if (-not (Test-Path -Path 'variable:global:TimezoneBias'))
+    #Construct time stamp for log entry. CMTrace expresses the timezone bias as the minutes to ADD to local time to reach
+    #UTC, so the sign is the inverse of the .NET offset. The bias is computed fresh on every call: the previous cached form
+    #only flipped the sign on a local copy, so every log line after the first in a run carried the raw, wrong-signed value.
+    [string]$Bias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
+    if ($Bias -match "^-")
     {
-        [string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
-        if ($TimezoneBias -match "^-")
-        {
-            $TimezoneBias = $TimezoneBias.Replace('-', '+')
-        }
-        else
-        {
-            $TimezoneBias = '-' + $TimezoneBias
-        }
+        $TimezoneBias = $Bias.Replace('-', '+')
+    }
+    else
+    {
+        $TimezoneBias = '-' + $Bias
     }
     $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
     #Construct date for log entry
@@ -458,7 +465,7 @@ function Write-LogEntry
     $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Install-HPCMSL"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
     try
     {
-        Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
+        Out-File -InputObject $LogText -Append -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
     }
     catch [System.Exception]
     {

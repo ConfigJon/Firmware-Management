@@ -29,7 +29,7 @@
     .NOTES
         Created by: Jon Anderson
         Reference: https://www.configjon.com/working-with-the-dell-command-powershell-provider/
-        Modified: 2026-05-20
+        Modified: 2026-09-06
 
     .CHANGELOG
         2020-09-07 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Dell.
@@ -48,6 +48,13 @@
                      -Module can still be imported via optional -Import swtich
                      Normalized formatting and style throughout the script
                      Several smaller bug fixes and improvements
+        2026-09-06 - Fixed the timezone bias written to log entries. Every entry after the first carried the bias with the wrong sign, which shifts
+                     those entries' times in viewers that honor it, such as CMTrace. The bias is now computed on every write
+                     Gated the NuGet/PowerShellGet bootstrap to Windows PowerShell 5.1, matching the HP installer. Under PowerShell 7 NuGet and
+                     PowerShellGet are already current
+                     Module version decisions now compare as versions rather than strings, so a newer installed DellBIOSProvider version is kept
+                     instead of being downgraded when the local source or the gallery offers an older one
+                     The task sequence detection helper initializes its variables before use so it holds up under strict mode. No behavior change
 
 #>
 
@@ -94,32 +101,32 @@ param(
 
 function Get-TaskSequenceStatus
 {
-    #Determine if a task sequence is currently running
+    #Determine if a task sequence is currently running. The check is two-stage on purpose: creating Microsoft.SMS.TSEnvironment succeeds on any device with the
+    #ConfigMgr client installed, so that alone is a false positive; _SMSTSType is only readable while a task sequence is executing.
+    #The variables are initialized before the try blocks so the function also holds up under strict mode.
+    $TSEnv = $null
     try
     {
-        $TSEnv = New-Object -ComObject Microsoft.SMS.TSEnvironment
+        $TSEnv = New-Object -ComObject 'Microsoft.SMS.TSEnvironment'
     }
-    catch { }
+    catch
+    {
+        return $false
+    }
     if ($null -eq $TSEnv)
     {
         return $false
     }
-    else
+    $TSType = $null
+    try
     {
-        try
-        {
-            $SMSTSType = $TSEnv.Value("_SMSTSType")
-        }
-        catch { }
-        if ([string]::IsNullOrEmpty($SMSTSType))
-        {
-            return $false
-        }
-        else
-        {
-            return $true
-        }
+        $TSType = $TSEnv.Value('_SMSTSType')
     }
+    catch
+    {
+        return $false
+    }
+    return -not [string]::IsNullOrEmpty($TSType)
 }
 
 function Test-WinPE
@@ -420,18 +427,17 @@ function Write-LogEntry
     )
     #Determine log file location
     $LogFilePath = Join-Path -Path $LogsDirectory -ChildPath $FileName
-    #Construct time stamp for log entry
-    if (-not (Test-Path -Path 'variable:global:TimezoneBias'))
+    #Construct time stamp for log entry. CMTrace expresses the timezone bias as the minutes to ADD to local time to reach
+    #UTC, so the sign is the inverse of the .NET offset. The bias is computed fresh on every call: the previous cached form
+    #only flipped the sign on a local copy, so every log line after the first in a run carried the raw, wrong-signed value.
+    [string]$Bias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
+    if ($Bias -match "^-")
     {
-        [string]$global:TimezoneBias = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date)).TotalMinutes
-        if ($TimezoneBias -match "^-")
-        {
-            $TimezoneBias = $TimezoneBias.Replace('-', '+')
-        }
-        else
-        {
-            $TimezoneBias = '-' + $TimezoneBias
-        }
+        $TimezoneBias = $Bias.Replace('-', '+')
+    }
+    else
+    {
+        $TimezoneBias = '-' + $Bias
     }
     $Time = -join @((Get-Date -Format "HH:mm:ss.fff"), $TimezoneBias)
     #Construct date for log entry
@@ -442,7 +448,7 @@ function Write-LogEntry
     $LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""Install-DellBiosProvider"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
     try
     {
-        Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
+        Out-File -InputObject $LogText -Append -Encoding Default -FilePath $LogFilePath -ErrorAction Stop
     }
     catch [System.Exception]
     {
@@ -619,9 +625,14 @@ if ($ModulePath)
     }
     if (($null -ne $SourceVersion) -and ($null -ne $LocalVersion))
     {
-        if ($SourceVersion -eq $LocalVersion)
+        $Cmp = ([Version]$SourceVersion).CompareTo([Version]$LocalVersion)
+        if ($Cmp -eq 0)
         {
             Write-LogEntry -Value "The latest version of the DellBIOSProvider module is already installed" -Severity 1
+        }
+        elseif ($Cmp -lt 0)
+        {
+            Write-LogEntry -Value "A newer version of the DellBIOSProvider module is already installed" -Severity 1
         }
         else
         {
@@ -656,10 +667,18 @@ else
     #Bootstrap NuGet + PowerShellGet so a stock Windows PowerShell 5.1 image can reach the gallery
     if (-not $Rerun)
     {
-        Write-LogEntry -Value "Checking the version of the NuGet package provider" -Severity 1
-        Update-NuGet
-        Write-LogEntry -Value "Checking the version of the PowerShellGet module" -Severity 1
-        Update-PowerShellGet
+        #Skip the update for PowerShell 7
+        if ($PSVersionTable.PSEdition -eq 'Core')
+        {
+            Write-LogEntry -Value "Skipping NuGet/PowerShellGet bootstrap under PowerShell 7 (current versions ship in-box)" -Severity 1
+        }
+        else
+        {
+            Write-LogEntry -Value "Checking the version of the NuGet package provider" -Severity 1
+            Update-NuGet
+            Write-LogEntry -Value "Checking the version of the PowerShellGet module" -Severity 1
+            Update-PowerShellGet
+        }
     }
 
     #Get the version of the DellBIOSProvider module in the PowerShell Gallery
@@ -690,9 +709,14 @@ else
     }
     elseif ($null -ne $LocalVersion)
     {
-        if ($WebVersion -eq $LocalVersion)
+        $Cmp = ([Version]$WebVersion).CompareTo([Version]$LocalVersion)
+        if ($Cmp -eq 0)
         {
             Write-LogEntry -Value "The latest version of the DellBIOSProvider module is already installed" -Severity 1
+        }
+        elseif ($Cmp -lt 0)
+        {
+            Write-LogEntry -Value "A newer version of the DellBIOSProvider module is already installed" -Severity 1
         }
         else
         {
