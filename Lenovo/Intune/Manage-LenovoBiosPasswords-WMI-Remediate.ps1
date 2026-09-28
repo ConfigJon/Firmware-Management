@@ -334,7 +334,7 @@ function Invoke-LenovoSetSupervisorPassword
         {
             Write-LogEntry -Value "Win32_ComputerSystem query failed - assuming mobile platform (WmiOpcodePasswordAdmin prefix omitted)" -Severity 2
         }
-        
+
         #Preferred opcode change sequence; SetUpdate commits and returns the authoritative status string.
         try
         {
@@ -342,7 +342,7 @@ function Invoke-LenovoSetSupervisorPassword
             {
                 Write-LogEntry -Value "Desktop platform (PCSystemType -ne 2) - supplying current password via WmiOpcodePasswordAdmin before the change" -Severity 1
                 [void](Invoke-CimMethod -InputObject $OpcodeInterface -MethodName 'WmiOpcodeInterface' -Arguments @{ Parameter = "WmiOpcodePasswordAdmin:$OldPassword;" } -ErrorAction Stop)
-            }         
+            }
             [void](Invoke-CimMethod -InputObject $OpcodeInterface -MethodName 'WmiOpcodeInterface' -Arguments @{ Parameter = "WmiOpcodePasswordType:pap;" } -ErrorAction Stop)
             [void](Invoke-CimMethod -InputObject $OpcodeInterface -MethodName 'WmiOpcodeInterface' -Arguments @{ Parameter = "WmiOpcodePasswordCurrent01:$OldPassword;" } -ErrorAction Stop)
             [void](Invoke-CimMethod -InputObject $OpcodeInterface -MethodName 'WmiOpcodeInterface' -Arguments @{ Parameter = "WmiOpcodePasswordNew01:$NewPassword;" } -ErrorAction Stop)

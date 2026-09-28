@@ -97,11 +97,13 @@ $DesiredSettings = @{
     # 'PasswordCountExceededError'    = 'Disable'
 }
 
-#Desktop-specific desired state. Used when Win32_ComputerSystem.PCSystemType -ne 2.
-#Same rules as $DesiredSettings: names/values must match Lenovo_BiosSetting.CurrentSetting exactly.
-
+#Desktop overrides. On ThinkCentre/ThinkStation (Win32_ComputerSystem.PCSystemType -ne 2) these entries are merged over
+#$DesiredSettings at run time, so a setting can take the desktop value spelling where it differs from ThinkPad. Empty by
+#default = no behavior change. Names one family does not expose are already skipped as Unsupported, so $DesiredSettings
+#itself can hold ThinkPad-only and ThinkCentre-only names side by side. Same name/value rules as $DesiredSettings.
 $DesiredSettingsDesktop = @{
-    # 'BIOSPasswordAtBootDeviceList'  = 'Yes'
+    # Example - ThinkCentre spells this value 'Enabled' where ThinkPad uses 'Enable':
+    # 'SecureBoot'                    = 'Enabled'
 }
 
 #Payload =====================================================================================================================
@@ -990,20 +992,22 @@ try
 catch
 {
     $IsDesktop = $false
-    Write-LogEntry -Value "PCSystemType query failed: $($_.Exception.Message) - defaulting to laptop desired state" -Severity 2
+    Write-LogEntry -Value "PCSystemType query failed: $($_.Exception.Message) - treating as laptop (desktop overrides not applied)" -Severity 2
 }
 
 if ($IsDesktop)
 {
-    $DesiredSettings = $DesiredSettingsDesktop
-    Write-LogEntry -Value 'Form factor: Desktop - applying $DesiredSettingsDesktop' -Severity 1
+    #Desktop entries override the shared table. An empty $DesiredSettingsDesktop changes nothing.
+    foreach ($Name in $DesiredSettingsDesktop.Keys)
+    {
+        $DesiredSettings[$Name] = $DesiredSettingsDesktop[$Name]
+    }
+    Write-LogEntry -Value "Form factor: Desktop - $($DesiredSettingsDesktop.Count) desktop override(s) applied, managed settings count now $($DesiredSettings.Count)" -Severity 1
 }
 else
 {
-    Write-LogEntry -Value 'Form factor: Laptop/Mobile - applying $DesiredSettings' -Severity 1
+    Write-LogEntry -Value 'Form factor: Laptop/Mobile - using $DesiredSettings as-is' -Severity 1
 }
-
-Write-LogEntry -Value "Managed settings count: $($DesiredSettings.Count)" -Severity 1
 
 #DesiredSettings check.
 if ($DesiredSettings.Count -eq 0)
