@@ -8,6 +8,8 @@
         supervisor password is not supported (Lenovo needs the SDBM workflow), so that path returns FAILED.
         Cert-auth devices (PasswordState=128) short-circuit (SKIPPED) and the -Detect script flags them
         INCOMPATIBLE. Password changes apply at next reboot, so the SetUpdate return is authoritative (no readback).
+        ThinkCentre/ThinkStation (PCSystemType -ne 2) get the current password supplied via WmiOpcodePasswordAdmin
+        before the change; ThinkPads must not (a successful Admin opcode disables the change opcodes until reboot).
 
         Build the payload with Tools\Build-IntunePayload.ps1; the certificate it references must be in
         Cert:\LocalMachine\My on the device before this runs. Full walkthrough in the blog posts below.
@@ -24,8 +26,8 @@
 
     .NOTES
         Created by: Jon Anderson
-        Version: 1.0.1
-        Modified: 2026-09-06
+        Version: 1.0.2
+        Modified: 2026-09-29
 #>
 
 #CimCmdlets is required up front instead of being loaded by the first CIM call: the module's alias definitions honor
@@ -59,7 +61,7 @@ param(
     [switch]$SkipManufacturerCheck
 )
 
-$Version = '1.0.1'
+$Version = '1.0.2'
 $Component = 'Manage-LenovoBiosPasswords-WMI-Remediate'
 
 #Payload =====================================================================================================================

@@ -7,7 +7,8 @@
         that cannot accept them. Skips on non-Lenovo hardware reporting (SKIPPED: settings out-of-scope).
         Settings are committed as one batch and apply at next reboot, so the Save status is authoritative
         (no readback - the next Detect cycle verifies). Cert-auth devices (PasswordState=128) short-circuit
-        (SKIPPED) and the -Detect script flags them INCOMPATIBLE.
+        (SKIPPED) and the -Detect script flags them INCOMPATIBLE. On ThinkCentre/ThinkStation the
+        optional $DesiredSettingsDesktop table is merged over $DesiredSettings before comparing.
 
         Build the payload with Tools\Build-IntunePayload.ps1; the certificate it references must be in
         Cert:\LocalMachine\My on the device before this runs. Full walkthrough in the blog posts below.
@@ -32,8 +33,8 @@
 
     .NOTES
         Created by: Jon Anderson
-        Version: 1.0.1
-        Modified: 2026-09-06
+        Version: 1.0.2
+        Modified: 2026-09-29
 #>
 
 #CimCmdlets is required up front instead of being loaded by the first CIM call: the module's alias definitions honor
@@ -80,14 +81,15 @@ param(
     [switch]$SkipManufacturerCheck
 )
 
-$Version = '1.0.1'
+$Version = '1.0.2'
 $Component = 'Manage-LenovoBiosSettings-WMI-Remediate'
 
 #Desired state ===============================================================================================================
 #Edit this hashtable to match your desired Lenovo BIOS configuration.
+#Keep this table and $DesiredSettingsDesktop identical in the paired -Detect script.
 #Names match the first comma-delimited field of Lenovo_BiosSetting.CurrentSetting exactly.
-#Values match the parsed CurrentSetting value exactly. ('Enable' / 'Disable' / 'Auto' / 'Yes').
-#Use the existing Manage-LenovoBiosSettings.ps1 GetSettings mode to list what the device exposes.
+#Values match the parsed CurrentSetting value exactly. The vocabulary is family-specific (ThinkPad 'Enable' / 'Disable',
+#ThinkCentre 'Enabled' / 'Disabled', ...): take names AND values from the Manage-LenovoBiosSettings.ps1 GetSettings output.
 
 $DesiredSettings = @{
     # Examples - replace with the settings your devices should standardize on:

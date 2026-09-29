@@ -6,7 +6,8 @@
         unauthenticated). Per-setting Unsupported and cached-Failed states are excluded from the drift
         count so the dashboard does not show permanent non-compliance on hardware that cannot accept a
         setting. Skips on non-Lenovo hardware reporting (COMPLIANT: settings out-of-scope). Cert-auth
-        devices (PasswordState=128) are reported NONCOMPLIANT INCOMPATIBLE.
+        devices (PasswordState=128) are reported NONCOMPLIANT INCOMPATIBLE. On ThinkCentre/ThinkStation
+        the optional $DesiredSettingsDesktop table is merged over $DesiredSettings before comparing.
 
     .PARAMETER Profile
         Name of the desired-state profile, stamped into the marker. Must match the value in the paired script.
@@ -28,8 +29,8 @@
 
     .NOTES
         Created by: Jon Anderson
-        Version: 1.0.1
-        Modified: 2026-09-06
+        Version: 1.0.2
+        Modified: 2026-09-29
 #>
 
 #Parameters ===================================================================================================================
@@ -77,14 +78,15 @@ param(
     [switch]$SkipManufacturerCheck
 )
 
-$Version = '1.0.1'
+$Version = '1.0.2'
 $Component = 'Manage-LenovoBiosSettings-WMI-Detect'
 
 #Desired state ===============================================================================================================
 #Edit this hashtable to match your desired Lenovo BIOS configuration.
+#Keep this table and $DesiredSettingsDesktop identical in the paired -Remediate script.
 #Names match the first comma-delimited field of Lenovo_BiosSetting.CurrentSetting exactly.
-#Values match the parsed CurrentSetting value exactly. ('Enable' / 'Disable' / 'Auto' / 'Yes').
-#Use the existing Manage-LenovoBiosSettings.ps1 GetSettings mode to list what the device exposes.
+#Values match the parsed CurrentSetting value exactly. The vocabulary is family-specific (ThinkPad 'Enable' / 'Disable',
+#ThinkCentre 'Enabled' / 'Disabled', ...): take names AND values from the Manage-LenovoBiosSettings.ps1 GetSettings output.
 
 $DesiredSettings = @{
     # Examples - replace with the settings your devices should standardize on:
