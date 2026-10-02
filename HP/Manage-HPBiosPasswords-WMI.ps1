@@ -108,10 +108,17 @@
 
     .NOTES
         Created by: Jon Anderson
-        Version: 2.3.2
-        Modified: 2026-09-05
+        Version: 2.3.3
+        Modified: 2026-10-02
 
         Changelog (newest first). See the related link for additional detail on each release.
+
+        2.3.3 (2026-10-02)
+            - Get-Help now displays the script's help. A non-standard section name stopped PowerShell from reading the help block, so the changelog is
+              now part of the NOTES section (shown by Get-Help -Full). Added a synopsis, gave each example its own entry, and listed the blog post as
+              a related link, so Get-Help -Online opens it.
+            - The old password parameter descriptions now state the limit of two passwords.
+            - Fixed spelling in the help text and in validation and log messages.
 
         2.3.2 (2026-09-05)
             - Improved WMI query failure reporting. When a query for a BIOS class fails, each retry warning now includes the error returned, the final
@@ -197,7 +204,7 @@ param(
 )
 
 #Script version
-$Version = '2.3.2'
+$Version = '2.3.3'
 
 #Log component name
 $Component = 'Manage-HPBiosPasswords-WMI'
