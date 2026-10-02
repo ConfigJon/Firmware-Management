@@ -10,7 +10,7 @@ PowerShell scripts for managing BIOS/firmware settings and passwords on Dell, HP
 
 ## Documentation
 
-All documentation is on my blog. This repository holds the scripts, and the README in each manufacturer folder lists the files in that folder and links each script to the post that documents it.
+All documentation is on my blog. This repository holds the scripts, and the README in each manufacturer folder ([Dell](Dell/README.md), [HP](HP/README.md), [Lenovo](Lenovo/README.md)) lists the files in that folder and links each script to the post that documents it.
 
 - **[BIOS / Firmware Configuration](https://www.configjon.com/bios-firmware-configuration/)** - the index of all the posts
 - **[BIOS Management Scripts v2 Released](https://www.configjon.com/bios-management-scripts-v2/)** - overview of the task sequence and interactive scripts
