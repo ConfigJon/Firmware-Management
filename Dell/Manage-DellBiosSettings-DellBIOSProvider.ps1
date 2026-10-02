@@ -64,10 +64,16 @@
 
     .NOTES
         Created by: Jon Anderson
-        Version: 2.3.1
-        Modified: 2026-09-05
+        Version: 2.3.2
+        Modified: 2026-10-02
 
         Changelog (newest first). See the related link for additional detail on each release.
+
+        2.3.2 (2026-10-02)
+            - Get-Help now displays the script's help. A non-standard section name stopped PowerShell from reading the help block, so the changelog is
+              now part of the NOTES section (shown by Get-Help -Full). Added a synopsis, gave each example its own entry, and listed the blog post as
+              a related link, so Get-Help -Online opens it.
+            - Fixed a spelling error in the LogFile parameter's validation message.
 
         2.3.1 (2026-09-05)
             - A missing, empty, or mis-headed CSV file passed to CsvPath now stops the script with a logged error instead of applying nothing. The
@@ -134,7 +140,7 @@ param(
 )
 
 #Script version
-$Version = '2.3.1'
+$Version = '2.3.2'
 
 #Log component name
 $Component = 'Manage-DellBiosSettings-DellBIOSProvider'
