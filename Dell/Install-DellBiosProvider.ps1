@@ -39,7 +39,7 @@
 
     .NOTES
         Created by: Jon Anderson
-        Modified: 2026-09-06
+        Modified: 2026-10-02
 
         Changelog (oldest first).
 
@@ -66,6 +66,9 @@
                      Module version decisions now compare as versions rather than strings, so a newer installed DellBIOSProvider version is kept
                      instead of being downgraded when the local source or the gallery offers an older one
                      The task sequence detection helper initializes its variables before use so it holds up under strict mode. No behavior change
+        2026-10-02 - Get-Help now displays the script's help. A non-standard section name stopped PowerShell from reading the help block, so the
+                     changelog is now part of the NOTES section (shown by Get-Help -Full)
+                     Added a synopsis, gave each example its own entry, and listed the blog post as a related link, so Get-Help -Online opens it
 
 #>
 
