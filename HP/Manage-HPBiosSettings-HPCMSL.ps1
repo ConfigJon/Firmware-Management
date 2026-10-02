@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Get or set HP BIOS settings, or reset them to defaults, using the HP Client Management Script Library (HPCMSL).
+
     .DESCRIPTION
         Automatically configure HP BIOS settings
         This variant uses the HP Client Management Script Library (HPCMSL) instead of direct WMI calls.
@@ -26,32 +29,44 @@
         Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
     .EXAMPLE
-        #Set BIOS settings supplied in the script
-        Manage-HPBiosSettings-HPCMSL.ps1 -SetSettings -SetupPassword ExamplePassword
+        PS C:\> Manage-HPBiosSettings-HPCMSL.ps1 -SetSettings -SetupPassword ExamplePassword
 
-        #Set BIOS settings supplied in a CSV file
-        Manage-HPBiosSettings-HPCMSL.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -SetupPassword ExamplePassword
+        Set BIOS settings supplied in the script.
 
-        #Set BIOS settings using a setup password sourced from a CMS-encrypted file
-        Manage-HPBiosSettings-HPCMSL.ps1 -SetSettings -SetupPasswordCmsFile C:\Temp\setup.cms
+    .EXAMPLE
+        PS C:\> Manage-HPBiosSettings-HPCMSL.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -SetupPassword ExamplePassword
 
-        #Output a list of current BIOS settings to the screen
-        Manage-HPBiosSettings-HPCMSL.ps1 -GetSettings
+        Set BIOS settings supplied in a CSV file.
 
-        #Output a list of current BIOS settings to a CSV file
-        Manage-HPBiosSettings-HPCMSL.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
+    .EXAMPLE
+        PS C:\> Manage-HPBiosSettings-HPCMSL.ps1 -SetSettings -SetupPasswordCmsFile C:\Temp\setup.cms
 
-        #Reset all BIOS settings to their default values
-        Manage-HPBiosSettings-HPCMSL.ps1 -SetDefaults -SetupPassword ExamplePassword
+        Set BIOS settings using a setup password sourced from a CMS-encrypted file.
+
+    .EXAMPLE
+        PS C:\> Manage-HPBiosSettings-HPCMSL.ps1 -GetSettings
+
+        Output a list of current BIOS settings to the screen.
+
+    .EXAMPLE
+        PS C:\> Manage-HPBiosSettings-HPCMSL.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
+
+        Output a list of current BIOS settings to a CSV file.
+
+    .EXAMPLE
+        PS C:\> Manage-HPBiosSettings-HPCMSL.ps1 -SetDefaults -SetupPassword ExamplePassword
+
+        Reset all BIOS settings to their default values.
+
+    .LINK
+        https://www.configjon.com/hp-bios-settings-management-hpcmsl/
 
     .NOTES
         Created by: Jon Anderson
-        Reference: https://www.configjon.com/hp-bios-settings-management-hpcmsl/
         Version: 2.3.2
         Modified: 2026-09-05
 
-    .CHANGELOG
-        See .NOTES Reference for additional detail on each release.
+        Changelog (newest first). See the related link for additional detail on each release.
 
         2.3.2 (2026-09-05)
             - A missing, empty, or mis-headed CSV file passed to CsvPath now stops the script with a logged error instead of applying nothing. The

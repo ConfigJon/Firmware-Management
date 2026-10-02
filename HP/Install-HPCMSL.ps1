@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Install the HP Client Management Script Library (HPCMSL) modules from the PowerShell Gallery or a local copy.
+
     .DESCRIPTION
         Install the HP Client Management Script Library PowerShell modules
 
@@ -16,24 +19,34 @@
         Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
     .EXAMPLE
-        Running in a full Windows OS and installing from the internet
-            Install-HPCMSL.ps1
+        PS C:\> Install-HPCMSL.ps1
 
-        Running in WinPE or offline
-            Install-HPCMSL.ps1 -ModulePath HPCMSL
+        Running in a full Windows OS and installing from the internet.
 
-        Installing for both Windows PowerShell 5.1 and PowerShell 7
-            Install-HPCMSL.ps1 -AllEditions
+    .EXAMPLE
+        PS C:\> Install-HPCMSL.ps1 -ModulePath HPCMSL
 
-        Installing and importing the module into the current session
-            Install-HPCMSL.ps1 -Import
+        Running in WinPE or offline.
+
+    .EXAMPLE
+        PS C:\> Install-HPCMSL.ps1 -AllEditions
+
+        Installing for both Windows PowerShell 5.1 and PowerShell 7.
+
+    .EXAMPLE
+        PS C:\> Install-HPCMSL.ps1 -Import
+
+        Installing and importing the module into the current session.
+
+    .LINK
+        https://www.configjon.com/installing-the-hp-client-management-script-library/
 
     .NOTES
         Created by: Jon Anderson
-        Reference: https://www.configjon.com/installing-the-hp-client-management-script-library
         Modified: 2026-09-06
 
-    .CHANGELOG
+        Changelog (oldest first).
+
         2020-09-14 - Added a LogFile parameter. Changed the default log path in full Windows to $env:ProgramData\ConfigJonScripts\HP.
                      Created a new function (Stop-Script) to consolidate some duplicate code and improve error reporting. Made a number of minor formatting and syntax changes
         2020-09-17 - Improved the log file path configuration

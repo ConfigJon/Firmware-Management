@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Manage Lenovo BIOS supervisor, power on, system management, and hard drive passwords using WMI.
+
     .DESCRIPTION
         Automatically configure Lenovo BIOS passwords and prompt the user if manual intervention is required.
 
@@ -6,7 +9,7 @@
         Specify this switch to change an existing supervisor password. Must also specify the SupervisorPassword parameter.
 
     .PARAMETER SupervisorClear
-        Specify this swtich to clear an existing supervisor password. Must also specify the OldSupervisorPassword parameter.
+        Specify this switch to clear an existing supervisor password. Must also specify the OldSupervisorPassword parameter.
 
     .PARAMETER PowerOnSet
         Specify this switch to set or change a power on password. Must also specify the PowerOnPassword parameter. Setting a power on password when none currently exists requires a supervisor or system management password to authorize the operation.
@@ -18,28 +21,28 @@
         Specify this switch to set or change the system management password. Must also specify the SystemManagementPassword parameter. Setting a system management password when none currently exists requires a supervisor password to authorize the operation.
 
     .PARAMETER SystemManagementClear
-        Specify this swtich to clear an existing system management password. Must also specify the OldSystemManagementPassword parameter.
+        Specify this switch to clear an existing system management password. Must also specify the OldSystemManagementPassword parameter.
 
     .PARAMETER HDDPasswordClear
-        Specify this swtich to clear an existing master and/or user hard drive password. Must also specify the HDDMasterPassword and/or HDDUserPassword parameters.
+        Specify this switch to clear an existing master and/or user hard drive password. Must also specify the HDDMasterPassword and/or HDDUserPassword parameters.
 
     .PARAMETER SupervisorPassword
         Specify the new supervisor password to set.
 
     .PARAMETER OldSupervisorPassword
-        Specify the old supervisor password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
+        Specify the old supervisor password(s) to be changed. Up to two passwords can be specified as a comma separated list.
 
     .PARAMETER PowerOnPassword
         Specify the new power on password to set.
 
     .PARAMETER OldPowerOnPassword
-        Specify the old power on password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
+        Specify the old power on password(s) to be changed. Up to two passwords can be specified as a comma separated list.
 
     .PARAMETER SystemManagementPassword
         Specify the new system management password to set.
 
     .PARAMETER OldSystemManagementPassword
-        Specify the old system management password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
+        Specify the old system management password(s) to be changed. Up to two passwords can be specified as a comma separated list.
 
     .PARAMETER HDDUserPassword
         Specify the current user hard drive password to clear.
@@ -51,19 +54,19 @@
         Specify the path to a CMS-encrypted file containing the new supervisor password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of SupervisorPassword to keep the password off the command line. Cannot be combined with SupervisorPassword.
 
     .PARAMETER OldSupervisorPasswordCmsFile
-        Specify the path(s) to CMS-encrypted file(s) containing the old supervisor password(s) to be changed. Multiple paths can be specified as a comma separated list. Use this instead of OldSupervisorPassword. Cannot be combined with OldSupervisorPassword.
+        Specify the path(s) to CMS-encrypted file(s) containing the old supervisor password(s) to be changed. Up to two paths can be specified as a comma separated list. Use this instead of OldSupervisorPassword. Cannot be combined with OldSupervisorPassword.
 
     .PARAMETER PowerOnPasswordCmsFile
         Specify the path to a CMS-encrypted file containing the new power on password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of PowerOnPassword to keep the password off the command line. Cannot be combined with PowerOnPassword.
 
     .PARAMETER OldPowerOnPasswordCmsFile
-        Specify the path(s) to CMS-encrypted file(s) containing the old power on password(s) to be changed. Multiple paths can be specified as a comma separated list. Use this instead of OldPowerOnPassword. Cannot be combined with OldPowerOnPassword.
+        Specify the path(s) to CMS-encrypted file(s) containing the old power on password(s) to be changed. Up to two paths can be specified as a comma separated list. Use this instead of OldPowerOnPassword. Cannot be combined with OldPowerOnPassword.
 
     .PARAMETER SystemManagementPasswordCmsFile
         Specify the path to a CMS-encrypted file containing the new system management password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of SystemManagementPassword to keep the password off the command line. Cannot be combined with SystemManagementPassword.
 
     .PARAMETER OldSystemManagementPasswordCmsFile
-        Specify the path(s) to CMS-encrypted file(s) containing the old system management password(s) to be changed. Multiple paths can be specified as a comma separated list. Use this instead of OldSystemManagementPassword. Cannot be combined with OldSystemManagementPassword.
+        Specify the path(s) to CMS-encrypted file(s) containing the old system management password(s) to be changed. Up to two paths can be specified as a comma separated list. Use this instead of OldSystemManagementPassword. Cannot be combined with OldSystemManagementPassword.
 
     .PARAMETER HDDUserPasswordCmsFile
         Specify the path to a CMS-encrypted file containing the current user hard drive password to clear. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of HDDUserPassword. Cannot be combined with HDDUserPassword.
@@ -84,32 +87,44 @@
         Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
     .EXAMPLE
-        Change an existing supervisor password
-        Manage-LenovoBiosPasswords.ps1 -SupervisorSet -SupervisorPassword <String> -OldSupervisorPassword <String1>,<String2>
+        PS C:\> Manage-LenovoBiosPasswords.ps1 -SupervisorSet -SupervisorPassword <String> -OldSupervisorPassword <String1>,<String2>
 
-        Change an existing supervisor password and clear a power on password
-        Manage-LenovoBiosPasswords.ps1 -SupervisorSet -SupervisorPassword <String> -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
+        Change an existing supervisor password.
 
-        Clear existing supervisor and power on passwords
-        Manage-LenovoBiosPasswords.ps1 -SupervisorClear -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
+    .EXAMPLE
+        PS C:\> Manage-LenovoBiosPasswords.ps1 -SupervisorSet -SupervisorPassword <String> -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
 
-        Clear existing user and master hard drive passwords
-        Manage-LenovoBiosPasswords.ps1 -HDDPasswordClear -HDDUserPassword <String> -HDDMasterPassword <String>
+        Change an existing supervisor password and clear a power on password.
 
-        Clear an existing power on password, suppress any user prompts, and continue on error
-        Manage-LenovoBiosPasswords.ps1 -PowerOnClear -OldPowerOnPassword <String1>,<String2> -NoUserPrompt -ContinueOnError
+    .EXAMPLE
+        PS C:\> Manage-LenovoBiosPasswords.ps1 -SupervisorClear -OldSupervisorPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
 
-        Change an existing supervisor password sourced from CMS-encrypted files
-        Manage-LenovoBiosPasswords.ps1 -SupervisorSet -SupervisorPasswordCmsFile <String> -OldSupervisorPasswordCmsFile <String1>,<String2>
+        Clear existing supervisor and power on passwords.
+
+    .EXAMPLE
+        PS C:\> Manage-LenovoBiosPasswords.ps1 -HDDPasswordClear -HDDUserPassword <String> -HDDMasterPassword <String>
+
+        Clear existing user and master hard drive passwords.
+
+    .EXAMPLE
+        PS C:\> Manage-LenovoBiosPasswords.ps1 -PowerOnClear -OldPowerOnPassword <String1>,<String2> -NoUserPrompt -ContinueOnError
+
+        Clear an existing power on password, suppress any user prompts, and continue on error.
+
+    .EXAMPLE
+        PS C:\> Manage-LenovoBiosPasswords.ps1 -SupervisorSet -SupervisorPasswordCmsFile <String> -OldSupervisorPasswordCmsFile <String1>,<String2>
+
+        Change an existing supervisor password sourced from CMS-encrypted files.
+
+    .LINK
+        https://www.configjon.com/lenovo-bios-password-management/
 
     .NOTES
         Created by: Jon Anderson
-        Reference: https://www.configjon.com/lenovo-bios-password-management
         Version: 2.3.1
         Modified: 2026-09-05
 
-    .CHANGELOG
-        See .NOTES Reference for additional detail on each release.
+        Changelog (newest first). See the related link for additional detail on each release.
 
         2.3.1 (2026-09-05)
             - Supervisor password changes and clears on systems using the WMI opcode interface are now reported as submitted for validation at the

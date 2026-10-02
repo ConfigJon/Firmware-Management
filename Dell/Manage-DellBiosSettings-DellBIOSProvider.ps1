@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Get or set Dell BIOS settings, or set the boot order, using the DellBIOSProvider module.
+
     .DESCRIPTION
         Automatically configure Dell BIOS settings
 
@@ -27,32 +30,44 @@
         Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
     .EXAMPLE
-        #Set BIOS settings supplied in the script
-        Manage-DellBiosSettings-DellBIOSProvider.ps1 -SetSettings -AdminPassword ExamplePassword
+        PS C:\> Manage-DellBiosSettings-DellBIOSProvider.ps1 -SetSettings -AdminPassword ExamplePassword
 
-        #Set BIOS settings supplied in a CSV file
-        Manage-DellBiosSettings-DellBIOSProvider.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -AdminPassword ExamplePassword
+        Set BIOS settings supplied in the script.
 
-        #Set BIOS settings using an admin password sourced from a CMS-encrypted file
-        Manage-DellBiosSettings-DellBIOSProvider.ps1 -SetSettings -AdminPasswordCmsFile C:\Temp\admin.cms
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-DellBIOSProvider.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -AdminPassword ExamplePassword
 
-        #Set the UEFI boot order
-        Manage-DellBiosSettings-DellBIOSProvider.ps1 -SetBootOrder hdd.1,embnicipv4,embnicipv6 -BootMode UEFI -AdminPassword ExamplePassword
+        Set BIOS settings supplied in a CSV file.
 
-        #Output a list of current BIOS settings to the screen
-        Manage-DellBiosSettings-DellBIOSProvider.ps1 -GetSettings
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-DellBIOSProvider.ps1 -SetSettings -AdminPasswordCmsFile C:\Temp\admin.cms
 
-        #Output a list of current BIOS settings to a CSV file
-        Manage-DellBiosSettings-DellBIOSProvider.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
+        Set BIOS settings using an admin password sourced from a CMS-encrypted file.
+
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-DellBIOSProvider.ps1 -SetBootOrder hdd.1,embnicipv4,embnicipv6 -BootMode UEFI -AdminPassword ExamplePassword
+
+        Set the UEFI boot order.
+
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-DellBIOSProvider.ps1 -GetSettings
+
+        Output a list of current BIOS settings to the screen.
+
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-DellBIOSProvider.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
+
+        Output a list of current BIOS settings to a CSV file.
+
+    .LINK
+        https://www.configjon.com/dell-bios-settings-management/
 
     .NOTES
         Created by: Jon Anderson
-        Reference: https://www.configjon.com/dell-bios-settings-management/
         Version: 2.3.1
         Modified: 2026-09-05
 
-    .CHANGELOG
-        See .NOTES Reference for additional detail on each release.
+        Changelog (newest first). See the related link for additional detail on each release.
 
         2.3.1 (2026-09-05)
             - A missing, empty, or mis-headed CSV file passed to CsvPath now stops the script with a logged error instead of applying nothing. The

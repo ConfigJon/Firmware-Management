@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Set, change, or clear HP BIOS setup and power on passwords using the HP Client Management Script Library (HPCMSL).
+
     .DESCRIPTION
         Automatically configure HP BIOS passwords and prompt the user if manual intervention is required.
         This variant uses the HP Client Management Script Library (HPCMSL) instead of direct WMI calls.
@@ -8,7 +11,7 @@
         Specify this switch to set a new setup password or change an existing setup password.
 
     .PARAMETER SetupClear
-        Specify this swtich to clear an existing setup password. Must also specify the OldSetupPassword parameter.
+        Specify this switch to clear an existing setup password. Must also specify the OldSetupPassword parameter.
 
     .PARAMETER PowerOnSet
         Specify this switch to set a new power on password or change an existing power on password. HP firmware requires a setup password to manage the power on password, so a setup password must already be set (specify SetupPassword) or be set in the same run (specify SetupSet and SetupPassword).
@@ -20,25 +23,25 @@
         Specify the new setup password to set.
 
     .PARAMETER OldSetupPassword
-        Specify the old setup password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
+        Specify the old setup password(s) to be changed. Up to two passwords can be specified as a comma separated list.
 
     .PARAMETER PowerOnPassword
         Specify the new power on password to set.
 
     .PARAMETER OldPowerOnPassword
-        Specify the old power on password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
+        Specify the old power on password(s) to be changed. Up to two passwords can be specified as a comma separated list.
 
     .PARAMETER SetupPasswordCmsFile
         Specify the path to a CMS-encrypted file containing the new setup password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of SetupPassword to keep the password off the command line. Cannot be combined with SetupPassword.
 
     .PARAMETER OldSetupPasswordCmsFile
-        Specify the path(s) to CMS-encrypted file(s) containing the old setup password(s) to be changed. Multiple paths can be specified as a comma separated list. Use this instead of OldSetupPassword. Cannot be combined with OldSetupPassword.
+        Specify the path(s) to CMS-encrypted file(s) containing the old setup password(s) to be changed. Up to two paths can be specified as a comma separated list. Use this instead of OldSetupPassword. Cannot be combined with OldSetupPassword.
 
     .PARAMETER PowerOnPasswordCmsFile
         Specify the path to a CMS-encrypted file containing the new power on password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of PowerOnPassword to keep the password off the command line. Cannot be combined with PowerOnPassword.
 
     .PARAMETER OldPowerOnPasswordCmsFile
-        Specify the path(s) to CMS-encrypted file(s) containing the old power on password(s) to be changed. Multiple paths can be specified as a comma separated list. Use this instead of OldPowerOnPassword. Cannot be combined with OldPowerOnPassword.
+        Specify the path(s) to CMS-encrypted file(s) containing the old power on password(s) to be changed. Up to two paths can be specified as a comma separated list. Use this instead of OldPowerOnPassword. Cannot be combined with OldPowerOnPassword.
 
     .PARAMETER NoUserPrompt
         The script will run silently and will not prompt the user with a message box.
@@ -53,44 +56,64 @@
         Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
     .EXAMPLE
-        Set a new setup password when no old passwords exist
-        Manage-HPBiosPasswords-HPCMSL.ps1 -SetupSet -SetupPassword <String>
+        PS C:\> Manage-HPBiosPasswords-HPCMSL.ps1 -SetupSet -SetupPassword <String>
 
-        Set or change a setup password
-        Manage-HPBiosPasswords-HPCMSL.ps1 -SetupSet -SetupPassword <String> -OldSetupPassword <String1>,<String2>
+        Set a new setup password when no old passwords exist.
 
-        Clear existing setup password(s)
-        Manage-HPBiosPasswords-HPCMSL.ps1 -SetupClear -OldSetupPassword <String1>,<String2>
+    .EXAMPLE
+        PS C:\> Manage-HPBiosPasswords-HPCMSL.ps1 -SetupSet -SetupPassword <String> -OldSetupPassword <String1>,<String2>
 
-        Set a new setup password and set a new power on password when no old passwords exist
-        Manage-HPBiosPasswords-HPCMSL.ps1 -SetupSet -PowerOnSet -SetupPassword <String1> -PowerOnPassword <String1>
+        Set or change a setup password.
 
-        Set or change an existing setup password and clear a power on password
-        Manage-HPBiosPasswords-HPCMSL.ps1 -SetupSet -SetupPassword <String> -OldSetupPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
+    .EXAMPLE
+        PS C:\> Manage-HPBiosPasswords-HPCMSL.ps1 -SetupClear -OldSetupPassword <String1>,<String2>
 
-        Clear existing Setup and power on passwords
-        Manage-HPBiosPasswords-HPCMSL.ps1 -SetupClear -OldSetupPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
+        Clear existing setup password(s).
 
-        Set a new power on password when the setup password is already set
-        Manage-HPBiosPasswords-HPCMSL.ps1 -PowerOnSet -PowerOnPassword <String> -SetupPassword <String>
+    .EXAMPLE
+        PS C:\> Manage-HPBiosPasswords-HPCMSL.ps1 -SetupSet -PowerOnSet -SetupPassword <String1> -PowerOnPassword <String1>
 
-        Clear a power on password when the setup password is set (the setup password authorizes the clear)
-        Manage-HPBiosPasswords-HPCMSL.ps1 -PowerOnClear -SetupPassword <String>
+        Set a new setup password and set a new power on password when no old passwords exist.
 
-        Clear both the setup and power on passwords in a single run (the power on password is cleared first, authorized by the setup password)
-        Manage-HPBiosPasswords-HPCMSL.ps1 -SetupClear -OldSetupPassword <String1>,<String2> -PowerOnClear
+    .EXAMPLE
+        PS C:\> Manage-HPBiosPasswords-HPCMSL.ps1 -SetupSet -SetupPassword <String> -OldSetupPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
 
-        Set a new setup password sourced from a CMS-encrypted file
-        Manage-HPBiosPasswords-HPCMSL.ps1 -SetupSet -SetupPasswordCmsFile <String>
+        Set or change an existing setup password and clear a power on password.
+
+    .EXAMPLE
+        PS C:\> Manage-HPBiosPasswords-HPCMSL.ps1 -SetupClear -OldSetupPassword <String1>,<String2> -PowerOnClear -OldPowerOnPassword <String1>,<String2>
+
+        Clear existing Setup and power on passwords.
+
+    .EXAMPLE
+        PS C:\> Manage-HPBiosPasswords-HPCMSL.ps1 -PowerOnSet -PowerOnPassword <String> -SetupPassword <String>
+
+        Set a new power on password when the setup password is already set.
+
+    .EXAMPLE
+        PS C:\> Manage-HPBiosPasswords-HPCMSL.ps1 -PowerOnClear -SetupPassword <String>
+
+        Clear a power on password when the setup password is set (the setup password authorizes the clear).
+
+    .EXAMPLE
+        PS C:\> Manage-HPBiosPasswords-HPCMSL.ps1 -SetupClear -OldSetupPassword <String1>,<String2> -PowerOnClear
+
+        Clear both the setup and power on passwords in a single run (the power on password is cleared first, authorized by the setup password).
+
+    .EXAMPLE
+        PS C:\> Manage-HPBiosPasswords-HPCMSL.ps1 -SetupSet -SetupPasswordCmsFile <String>
+
+        Set a new setup password sourced from a CMS-encrypted file.
+
+    .LINK
+        https://www.configjon.com/hp-bios-password-management-hpcmsl/
 
     .NOTES
         Created by: Jon Anderson
-        Reference: https://www.configjon.com/hp-bios-password-management-hpcmsl/
         Version: 2.3.1
         Modified: 2026-09-05
 
-    .CHANGELOG
-        See .NOTES Reference for additional detail on each release.
+        Changelog (newest first). See the related link for additional detail on each release.
 
         2.3.1 (2026-09-05)
             - Fixed the timezone bias written to log entries. Every entry after the first carried the bias with the wrong sign, which shifts those

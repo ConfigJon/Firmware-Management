@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Set, change, or clear Dell BIOS admin and system passwords using the DellBIOSProvider module.
+
     .DESCRIPTION
         Automatically configure Dell BIOS passwords and prompt the user if manual intervention is required.
 
@@ -6,10 +9,10 @@
         Specify this switch to set a new admin password or change an existing admin password.
 
     .PARAMETER AdminClear
-        Specify this swtich to clear an existing admin password. Must also specify the OldAdminPassword parameter.
+        Specify this switch to clear an existing admin password. Must also specify the OldAdminPassword parameter.
 
     .PARAMETER SystemSet
-        Specify this switch to set a new system password or change an existing setup password.
+        Specify this switch to set a new system password or change an existing system password.
 
     .PARAMETER SystemClear
         Specify this switch to clear an existing system password. Must also specify the OldSystemPassword parameter.
@@ -18,25 +21,25 @@
         Specify the new admin password to set.
 
     .PARAMETER OldAdminPassword
-        Specify the old admin password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
+        Specify the old admin password(s) to be changed. Up to two passwords can be specified as a comma separated list.
 
     .PARAMETER SystemPassword
         Specify the new system password to set.
 
     .PARAMETER OldSystemPassword
-        Specify the old system password(s) to be changed. Multiple passwords can be specified as a comma seperated list.
+        Specify the old system password(s) to be changed. Up to two passwords can be specified as a comma separated list.
 
     .PARAMETER AdminPasswordCmsFile
         Specify the path to a CMS-encrypted file containing the new admin password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of AdminPassword to keep the password off the command line. Cannot be combined with AdminPassword.
 
     .PARAMETER OldAdminPasswordCmsFile
-        Specify the path(s) to CMS-encrypted file(s) containing the old admin password(s) to be changed. Multiple paths can be specified as a comma separated list. Use this instead of OldAdminPassword. Cannot be combined with OldAdminPassword.
+        Specify the path(s) to CMS-encrypted file(s) containing the old admin password(s) to be changed. Up to two paths can be specified as a comma separated list. Use this instead of OldAdminPassword. Cannot be combined with OldAdminPassword.
 
     .PARAMETER SystemPasswordCmsFile
         Specify the path to a CMS-encrypted file containing the new system password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of SystemPassword to keep the password off the command line. Cannot be combined with SystemPassword.
 
     .PARAMETER OldSystemPasswordCmsFile
-        Specify the path(s) to CMS-encrypted file(s) containing the old system password(s) to be changed. Multiple paths can be specified as a comma separated list. Use this instead of OldSystemPassword. Cannot be combined with OldSystemPassword.
+        Specify the path(s) to CMS-encrypted file(s) containing the old system password(s) to be changed. Up to two paths can be specified as a comma separated list. Use this instead of OldSystemPassword. Cannot be combined with OldSystemPassword.
 
     .PARAMETER NoUserPrompt
         The script will run silently and will not prompt the user with a message box.
@@ -51,29 +54,39 @@
         Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
     .EXAMPLE
-        Set a new admin password
-        Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -AdminPassword <String>
+        PS C:\> Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -AdminPassword <String>
 
-        Set or change a admin password
-        Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -AdminPassword <String> -OldAdminPassword <String1>,<String2>,<String3>
+        Set a new admin password.
 
-        Clear existing admin password(s)
-        Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminClear -OldAdminPassword <String1>,<String2>,<String3>
+    .EXAMPLE
+        PS C:\> Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -AdminPassword <String> -OldAdminPassword <String1>,<String2>
 
-        Set a new admin password and set a new system password
-        Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -SystemSet -AdminPassword <String> -SystemPassword <String>
+        Set or change an admin password.
 
-        Set a new admin password sourced from a CMS-encrypted file
-        Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -AdminPasswordCmsFile <String>
+    .EXAMPLE
+        PS C:\> Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminClear -OldAdminPassword <String1>,<String2>
+
+        Clear existing admin password(s).
+
+    .EXAMPLE
+        PS C:\> Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -SystemSet -AdminPassword <String> -SystemPassword <String>
+
+        Set a new admin password and set a new system password.
+
+    .EXAMPLE
+        PS C:\> Manage-DellBiosPasswords-DellBIOSProvider.ps1 -AdminSet -AdminPasswordCmsFile <String>
+
+        Set a new admin password sourced from a CMS-encrypted file.
+
+    .LINK
+        https://www.configjon.com/dell-bios-password-management/
 
     .NOTES
         Created by: Jon Anderson
-        Reference: https://www.configjon.com/dell-bios-password-management/
         Version: 2.3.1
         Modified: 2026-09-05
 
-    .CHANGELOG
-        See .NOTES Reference for additional detail on each release.
+        Changelog (newest first). See the related link for additional detail on each release.
 
         2.3.1 (2026-09-05)
             - Fixed an error when closing the task sequence progress dialog before the on-screen prompts for manual actions. The progress UI object
@@ -748,7 +761,7 @@ if($SystemPasswordCheck -eq "False")
     }
 }
 
-#If a admin password is set, attempt to clear or change it
+#If an admin password is set, attempt to clear or change it
 if($AdminPasswordCheck -eq "True")
 {
     #Change the existing admin password

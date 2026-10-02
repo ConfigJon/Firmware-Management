@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Install the Dell Command | PowerShell Provider (DellBIOSProvider) module from the PowerShell Gallery or a local copy.
+
     .DESCRIPTION
         Install the Dell Command | PowerShell Provider (DellBIOSProvider) module
 
@@ -17,21 +20,29 @@
         Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
     .EXAMPLE
-        Running in a full Windows OS and installing from the internet
-            Install-DellBiosProvider.ps1
+        PS C:\> Install-DellBiosProvider.ps1
 
-        Running in WinPE
-            Install-DellBiosProvider.ps1 -ModulePath DellBIOSProvider -DllPath DllFiles
+        Running in a full Windows OS and installing from the internet.
 
-        Installing and importing the module into the current session
-            Install-DellBiosProvider.ps1 -Import
+    .EXAMPLE
+        PS C:\> Install-DellBiosProvider.ps1 -ModulePath DellBIOSProvider -DllPath DllFiles
+
+        Running in WinPE.
+
+    .EXAMPLE
+        PS C:\> Install-DellBiosProvider.ps1 -Import
+
+        Installing and importing the module into the current session.
+
+    .LINK
+        https://www.configjon.com/working-with-the-dell-command-powershell-provider/
 
     .NOTES
         Created by: Jon Anderson
-        Reference: https://www.configjon.com/working-with-the-dell-command-powershell-provider/
         Modified: 2026-09-06
 
-    .CHANGELOG
+        Changelog (oldest first).
+
         2020-09-07 - Added a LogFile parameter. Changed the default log path in full Windows to $ENV:ProgramData\ConfigJonScripts\Dell.
                      Created a new function (Stop-Script) to consolidate some duplicate code and improve error reporting. Made a number of minor formatting and syntax changes
         2020-09-17 - Improved the log file path configuration

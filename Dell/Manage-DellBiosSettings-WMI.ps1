@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Get or set Dell BIOS settings, reset them to defaults, or set the boot order using WMI, with no module required.
+
     .DESCRIPTION
         Automatically configure Dell BIOS settings
 
@@ -27,50 +30,66 @@
         Specify the path to a CMS-encrypted file containing the current BIOS (admin) password. The file is decrypted in memory at runtime using the device's document-encryption certificate. Use this instead of AdminPassword to keep the password off the command line. Cannot be combined with AdminPassword.
 
     .PARAMETER SetDefaults
-        Instructs the script to set all BIOS settings to a default value. Accptable values are (BuiltInSafeDefaults,LastKnownGood,Factory,UserConf1,UserConf2)
+        Instructs the script to set all BIOS settings to a default value. Acceptable values are (BuiltInSafeDefaults,LastKnownGood,Factory,UserConf1,UserConf2)
 
     .PARAMETER SetBootOrder
         The desired boot order to be set on the system. Values should be specified in a comma separated list
 
     .PARAMETER BootMode
-        Used with the SetBootOrder switch. Specifies the boot mode the boot order should be set for. Accptable values are (UEFI or Legacy)
+        Used with the SetBootOrder parameter. Specifies the boot mode the boot order should be set for. Acceptable values are (UEFI or Legacy)
 
     .PARAMETER LogFile
         Specify the name of the log file along with the full path where it will be stored. The file must have a .log extension. During a task sequence the path will always be set to _SMSTSLogPath
 
     .EXAMPLE
-        #Set BIOS settings supplied in the script
-        Manage-DellBiosSettings-WMI.ps1 -SetSettings -AdminPassword ExamplePassword
+        PS C:\> Manage-DellBiosSettings-WMI.ps1 -SetSettings -AdminPassword ExamplePassword
 
-        #Set BIOS settings supplied in a CSV file
-        Manage-DellBiosSettings-WMI.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -AdminPassword ExamplePassword
+        Set BIOS settings supplied in the script.
 
-        #Set BIOS settings using an admin password sourced from a CMS-encrypted file
-        Manage-DellBiosSettings-WMI.ps1 -SetSettings -AdminPasswordCmsFile C:\Temp\admin.cms
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-WMI.ps1 -SetSettings -CsvPath C:\Temp\Settings.csv -AdminPassword ExamplePassword
 
-        #Set all BIOS settings to factory default values
-        Manage-DellBiosSettings-WMI.ps1 -SetDefaults Factory -AdminPassword ExamplePassword
+        Set BIOS settings supplied in a CSV file.
 
-        #Set the UEFI boot order
-        Manage-DellBiosSettings-WMI.ps1 -SetBootOrder "Windows Boot Manager","Onboard NIC(IPV4)","Onboard NIC(IPV6)" -BootMode UEFI -AdminPassword ExamplePassword
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-WMI.ps1 -SetSettings -AdminPasswordCmsFile C:\Temp\admin.cms
 
-        #Set BIOS settings supplied in the script and set the UEFI boot order
-        Manage-DellBiosSettings-WMI.ps1 -SetSettings -SetBootOrder "Windows Boot Manager","Onboard NIC(IPV4)","Onboard NIC(IPV6)" -BootMode UEFI -AdminPassword ExamplePassword
+        Set BIOS settings using an admin password sourced from a CMS-encrypted file.
 
-        #Output a list of current BIOS settings to the screen
-        Manage-DellBiosSettings-WMI.ps1 -GetSettings
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-WMI.ps1 -SetDefaults Factory -AdminPassword ExamplePassword
 
-        #Output a list of current BIOS settings to a CSV file
-        Manage-DellBiosSettings-WMI.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
+        Set all BIOS settings to factory default values.
+
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-WMI.ps1 -SetBootOrder "Windows Boot Manager","Onboard NIC(IPV4)","Onboard NIC(IPV6)" -BootMode UEFI -AdminPassword ExamplePassword
+
+        Set the UEFI boot order.
+
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-WMI.ps1 -SetSettings -SetBootOrder "Windows Boot Manager","Onboard NIC(IPV4)","Onboard NIC(IPV6)" -BootMode UEFI -AdminPassword ExamplePassword
+
+        Set BIOS settings supplied in the script and set the UEFI boot order.
+
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-WMI.ps1 -GetSettings
+
+        Output a list of current BIOS settings to the screen.
+
+    .EXAMPLE
+        PS C:\> Manage-DellBiosSettings-WMI.ps1 -GetSettings -CsvPath C:\Temp\Settings.csv
+
+        Output a list of current BIOS settings to a CSV file.
+
+    .LINK
+        https://www.configjon.com/dell-bios-settings-management-wmi/
 
     .NOTES
         Created by: Jon Anderson
-        Reference: https://www.configjon.com/dell-bios-settings-management-wmi/
         Version: 2.3.1
         Modified: 2026-09-05
 
-    .CHANGELOG
-        See .NOTES Reference for additional detail on each release.
+        Changelog (newest first). See the related link for additional detail on each release.
 
         2.3.1 (2026-09-05)
             - A missing, empty, or mis-headed CSV file passed to CsvPath now stops the script with a logged error instead of applying nothing. The
