@@ -148,7 +148,7 @@ param(
     [Parameter(Mandatory=$false)][ValidateScript({
             if($_ -notmatch '\.log$')
             {
-                throw "The file specified in the LogFile paramter must be a .log file"
+                throw "The file specified in the LogFile parameter must be a .log file"
             }
             return $true
         })]
@@ -673,7 +673,7 @@ if($OldPowerOnPassword.Count -gt 2) #Prevents entering more than 2 old power on 
 }
 if(($SMSTSPasswordRetry) -and !(Get-TaskSequenceStatus))
 {
-    Write-LogEntry -Value "The SMSTSPasswordRetry parameter was specifed while not running in a task sequence. Setting SMSTSPasswordRetry to false." -Severity 2
+    Write-LogEntry -Value "The SMSTSPasswordRetry parameter was specified while not running in a task sequence. Setting SMSTSPasswordRetry to false." -Severity 2
     $SMSTSPasswordRetry = $False
 }
 Write-LogEntry -Value "Parameter validation completed" -Severity 1

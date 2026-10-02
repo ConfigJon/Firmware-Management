@@ -111,7 +111,7 @@ param(
     [Parameter(Mandatory=$false)][ValidateScript({
             if($_ -notmatch '\.log$')
             {
-                throw "The file specified in the LogFile paramter must be a .log file"
+                throw "The file specified in the LogFile parameter must be a .log file"
             }
             return $true
         })]

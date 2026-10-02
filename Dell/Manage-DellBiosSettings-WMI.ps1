@@ -126,7 +126,7 @@ param(
     [Parameter(Mandatory=$false)][ValidateScript({
             if($_ -notmatch '\.log$')
             {
-                throw "The file specified in the LogFile paramter must be a .log file"
+                throw "The file specified in the LogFile parameter must be a .log file"
             }
             return $true
         })]
@@ -545,7 +545,7 @@ if($SetBootOrder -and $SetDefaults)
 }
 if(($SetBootOrder -or $SetDefaults) -and $CsvPath -and !($SetSettings))
 {
-    $ErrorMsg = "The CsvPath parameter has been specified without the SetSettings paramter. The CSV file will be ignored"
+    $ErrorMsg = "The CsvPath parameter has been specified without the SetSettings parameter. The CSV file will be ignored"
     Write-LogEntry -Value $ErrorMsg -Severity 2
 }
 Write-LogEntry -Value "Parameter validation completed" -Severity 1
