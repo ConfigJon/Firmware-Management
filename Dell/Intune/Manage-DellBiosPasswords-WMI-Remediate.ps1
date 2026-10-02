@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Intune remediation script that sets, reapplies, rotates, or clears the Dell BIOS admin password.
+
     .DESCRIPTION
         Intune remediation script for Dell BIOS admin password management (set / reapply / rotate / clear).
         Reads the HKLM marker + Dell BIOS state, decides the action, and applies it using the CMS-encrypted
@@ -17,6 +20,8 @@
 
     .LINK
         https://www.configjon.com/intune-bios-password-management/
+
+    .LINK
         https://www.configjon.com/bios-management-with-intune/
 
     .NOTES

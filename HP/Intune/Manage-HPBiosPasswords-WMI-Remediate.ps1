@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Intune remediation script that sets, reapplies, rotates, or clears the HP BIOS setup password.
+
     .DESCRIPTION
         Intune remediation script for HP BIOS setup password management (set / reapply / rotate / clear).
         Reads the HKLM marker + HP BIOS state, decides the action, and applies it using the CMS-encrypted
@@ -19,6 +22,8 @@
 
     .LINK
         https://www.configjon.com/intune-bios-password-management/
+
+    .LINK
         https://www.configjon.com/bios-management-with-intune/
 
     .NOTES

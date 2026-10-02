@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Intune remediation script that applies Lenovo BIOS settings that have drifted from the desired state.
+
     .DESCRIPTION
         Intune remediation script for Lenovo BIOS settings management. Compares the admin-edited
         $DesiredSettings hashtable to the BIOS-reported state, decrypts the password named by the pw marker
@@ -29,6 +32,8 @@
 
     .LINK
         https://www.configjon.com/intune-bios-settings-management/
+
+    .LINK
         https://www.configjon.com/bios-management-with-intune/
 
     .NOTES

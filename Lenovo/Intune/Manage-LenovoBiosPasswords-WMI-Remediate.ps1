@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Intune remediation script that rotates or clears the Lenovo BIOS supervisor password.
+
     .DESCRIPTION
         Intune remediation script for Lenovo BIOS supervisor password management (rotate / clear only).
         Reads the HKLM marker + Lenovo BIOS state, decides the action, and applies it using the
@@ -22,6 +25,8 @@
 
     .LINK
         https://www.configjon.com/intune-bios-password-management/
+
+    .LINK
         https://www.configjon.com/bios-management-with-intune/
 
     .NOTES

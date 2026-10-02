@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Embed CMS-encrypted BIOS password files in an Intune remediation script.
+
     .DESCRIPTION
         Embed one or more CMS-encrypted password files as base64 into an Intune Remediation script template
         by replacing the marked block:
@@ -34,9 +37,17 @@
         Overwrite OutputFile if it already exists.
 
     .EXAMPLE
-        Build-IntunePayload.ps1 -CmsFile 'C:\BiosPw\pw-v1.cms','C:\BiosPw\pw-v2.cms' -CertThumbprint 'A1B2C3D4E5F60718293A4B5C6D7E8F90A1B2C3D4' -TemplateFile '.\Manage-DellBiosPasswords-WMI-Remediate.template.ps1' -OutputFile '.\out\Manage-DellBiosPasswords-WMI-Remediate.ps1'
+        PS C:\> Build-IntunePayload.ps1 -CmsFile 'C:\BiosPw\pw-v1.cms','C:\BiosPw\pw-v2.cms' -CertThumbprint 'A1B2C3D4E5F60718293A4B5C6D7E8F90A1B2C3D4' -TemplateFile '.\Manage-DellBiosPasswords-WMI-Remediate.template.ps1' -OutputFile '.\out\Manage-DellBiosPasswords-WMI-Remediate.ps1'
 
-        Build-IntunePayload.ps1 -VersionFiles @{ 3='pw-v3.cms'; 4='pw-v4.cms'; 5='pw-v5.cms' } -CertThumbprint 'A1B2C3D4E5F60718293A4B5C6D7E8F90A1B2C3D4' -TemplateFile '.\Template.ps1' -OutputFile '.\Out.ps1' -Force
+        Embed two password files as versions 1 and 2, numbered by position, into a deployable copy of the remediation script.
+
+    .EXAMPLE
+        PS C:\> Build-IntunePayload.ps1 -VersionFiles @{ 3='pw-v3.cms'; 4='pw-v4.cms'; 5='pw-v5.cms' } -CertThumbprint 'A1B2C3D4E5F60718293A4B5C6D7E8F90A1B2C3D4' -TemplateFile '.\Template.ps1' -OutputFile '.\Out.ps1' -Force
+
+        Map each password version to its file explicitly (here versions 3, 4, and 5) and overwrite the output file if it exists.
+
+    .LINK
+        https://www.configjon.com/intune-bios-password-certificates/
 
     .NOTES
         Created by: Jon Anderson

@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Intune detection script that checks whether the HP BIOS setup password is at the target version.
+
     .DESCRIPTION
         Intune detection script for HP BIOS setup password management. Compares the on-device state
         (the HKLM marker + HP's 'Setup Password' IsSet query) to the target version and exits 0 (compliant)
@@ -14,6 +17,8 @@
 
     .LINK
         https://www.configjon.com/intune-bios-password-management/
+
+    .LINK
         https://www.configjon.com/bios-management-with-intune/
 
     .NOTES

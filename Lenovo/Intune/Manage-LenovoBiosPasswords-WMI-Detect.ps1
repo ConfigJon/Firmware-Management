@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Intune detection script that checks whether the Lenovo BIOS supervisor password is at the target version.
+
     .DESCRIPTION
         Intune detection script for Lenovo BIOS supervisor password management. Compares the on-device
         state (the HKLM marker + Lenovo's PasswordState bitmask) to the target version and exits 0
@@ -15,6 +18,8 @@
 
     .LINK
         https://www.configjon.com/intune-bios-password-management/
+
+    .LINK
         https://www.configjon.com/bios-management-with-intune/
 
     .NOTES

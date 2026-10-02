@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Intune detection script that checks whether the Dell BIOS admin password is at the target version.
+
     .DESCRIPTION
         Intune detection script for Dell BIOS password management. Compares the on-device state
         (the HKLM marker + Dell's IsPasswordSet WMI query) to the target version and exits 0 (compliant)
@@ -12,6 +15,8 @@
 
     .LINK
         https://www.configjon.com/intune-bios-password-management/
+
+    .LINK
         https://www.configjon.com/bios-management-with-intune/
 
     .NOTES

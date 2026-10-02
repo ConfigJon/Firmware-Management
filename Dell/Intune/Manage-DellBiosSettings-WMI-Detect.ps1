@@ -1,4 +1,7 @@
 <#
+    .SYNOPSIS
+        Intune detection script that checks whether Dell BIOS settings match the desired state.
+
     .DESCRIPTION
         Intune detection script for Dell BIOS settings management. Compares each setting in the
         admin-edited $DesiredSettings hashtable to the BIOS-reported current value and exits 0 (compliant)
@@ -23,6 +26,8 @@
 
     .LINK
         https://www.configjon.com/intune-bios-settings-management/
+
+    .LINK
         https://www.configjon.com/bios-management-with-intune/
 
     .NOTES
